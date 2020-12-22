@@ -1,0 +1,10 @@
+
+fileio.egg-info*
+fileio/config/cache/env.pkl
+build.sh
+*.vscode
+*cache
+*__pycache__
+*logs
+*dist
+*build
