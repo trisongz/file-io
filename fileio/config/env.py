@@ -22,12 +22,34 @@ def create_cloud_clients():
     import boto3
     from google.cloud import storage
     from google.oauth2 import service_account
+    from azure.storage.blob import BlobServiceClient
     cloud = {}
     adc_key = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', None)
     if adc_key and os.path.exists(adc_key):
-        cloud['s3_client'] = boto3.Session()
         cloud['gcp_client'] = service_account.Credentials.from_service_account_file(adc_key)
         cloud['gcs_client'] = storage.Client.from_service_account_json(adc_key)
+    aws_key = os.environ.get("AWS_ACCESS_KEY_ID", None)
+    aws_secret = os.environ.get("AWS_SECRET_ACCESS_KEY", None)
+    if aws_key and aws_secret:
+        cloud['s3_client'] = boto3.Session(
+            aws_access_key_id=aws_key,
+            aws_secret_access_key=aws_secret
+            )
+    else:
+        cloud['s3_client'] = boto3.Session()
+    azure_key = os.environ.get("AZURE_STORAGE_CONNECTION_STRING", None)
+    if azure_key:
+        cloud['azure_client'] = BlobServiceClient.from_connection_string(azure_key)
+    else:
+        cloud['azure_client'] = None
+    ssh_uname = os.environ.get("FILEIO_SSH_USER", None)
+    ssh_pword = os.environ.get("FILEIO_SSH_PASS", None)
+    if ssh_uname:
+        cloud['ssh'] = ssh_uname
+        if ssh_pword:
+            cloud['ssh'] = cloud['ssh'] + ':' + ssh_pword
+    else:
+        cloud['ssh'] = None
     return cloud
 
 def configure_cloud_clients():

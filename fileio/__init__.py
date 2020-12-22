@@ -93,6 +93,7 @@ def _file_exists(filename):
     except:
         return False
 
+_ssh_exts = ['ssh', 'scp', 'sftp']
 
 def get_read_fn(filename, binary=False, require=None):
     b = 'bin' if binary else 'def'
@@ -103,6 +104,9 @@ def get_read_fn(filename, binary=False, require=None):
                 return smart_open.open(filename, _read[b]['so'], transport_params=dict(client=cloud['gcs_client']))
             elif filename.startswith('s3://'):
                 return smart_open.open(filename, _read[b]['so'], transport_params={'session': cloud['s3_client']})
+            elif filename.startswith('azure://'):
+                params = {'client': cloud['azure_client']} if cloud['azure_client'] else None
+                return smart_open.open(filename, _read[b]['so'], transport_params=params)
             else:
                 return smart_open.open(filename, _read[b]['so'])
         elif require == 'tf':
@@ -136,6 +140,9 @@ def get_write_fn(filename, binary=False, overwrite=False, require=None):
                 return smart_open.open(filename, _write_mode[b]['so'], transport_params=dict(client=cloud['gcs_client']))
             elif filename.startswith('s3://'):
                 return smart_open.open(filename, _write_mode[b]['so'], transport_params={'session': cloud['s3_client']})
+            elif filename.startswith('azure://'):
+                params = {'client': cloud['azure_client']} if cloud['azure_client'] else None
+                return smart_open.open(filename, _write_mode[b]['so'], transport_params=params)
             else:
                 return smart_open.open(filename, _write_mode[b]['so'])
         elif require == 'tf':
