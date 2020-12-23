@@ -12,8 +12,8 @@ import json
 
 fileio_dir = os.path.abspath(os.path.dirname(__file__))
 
-from fileio.config.env import get_env, get_cloud_clients
-from fileio.utils.logger import get_logger
+from file_io.config.env import get_env, get_cloud_clients
+from file_io.utils.logger import get_logger
 from tqdm.auto import tqdm
 
 logger = get_logger()

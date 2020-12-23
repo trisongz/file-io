@@ -1,14 +1,15 @@
-# fileio
+# file_io
  Deterministic File Lib to make working with Files across Object Storage easier
 
 
 ## Quickstart
 
 ```python3
-!pip install --upgrade git+https://github.com/trisongz/fileio.git
+!pip install --upgrade git+https://github.com/trisongz/file_io.git
+!pip install --upgrade file-io
 
 
-from fileio import File
+from file_io import File
 import json
 
 input_file = 'yourfile.json' # alternatively ['file1.json', 'file2.json']
@@ -85,7 +86,7 @@ File.read_file(filename=None, binary=False, as_list=False, file_index=None)# wil
 
 # Additionally, you can use the deterministic r/w filelike objects such as
 
-from fileio import File
+from file_io import File
 import json
 
 f_in = 'gs://bucket/train_config.json'

@@ -7,7 +7,7 @@ import dill as pickle
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-from fileio.utils.logger import get_logger
+from file_io.utils.logger import get_logger
 
 _env_lock = threading.Lock()
 _env_handler = None
@@ -93,7 +93,7 @@ class Env:
         get_cloud_clients()
 
     def configure_imports(self, silent=True):
-        from fileio.config.imports import check_imports
+        from file_io.config.imports import check_imports
         self.vals['avail'] =  check_imports()
         if not silent:
             for lib, avail in self.vals['avail']['libs'].items():

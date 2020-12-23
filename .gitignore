@@ -1,6 +1,6 @@
 
-fileio.egg-info*
-fileio/config/cache/env.pkl
+file_io.egg-info*
+file_io/config/cache/env.pkl
 build.sh
 *.vscode
 *cache

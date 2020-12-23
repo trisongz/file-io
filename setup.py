@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 
 root = os.path.abspath(os.path.dirname(__file__))
-package_name = "fileio"
+package_name = "file_io"
 packages = find_packages(
     include=[package_name, "{}.*".format(package_name)]
 )
@@ -23,11 +23,12 @@ with open(os.path.join(root, 'README.md'), 'rb') as readme:
 setup(
     name=package_name,
     version=version,
-    description="fileio",
+    description="file_io",
     long_description=long_description,
+    long_description_content_type="text/markdown",
     author='Tri Songz',
     author_email='ts@scontentengine.ai',
-    url='http://github.com/trisongz/fileio',
+    url='http://github.com/trisongz/file_io',
     python_requires='>3.6',
     install_requires=[
         "tensorflow",
