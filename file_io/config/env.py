@@ -13,7 +13,7 @@ _env_lock = threading.Lock()
 _env_handler = None
 _cloud_clients = None
 _env_path = os.path.abspath(os.path.dirname(__file__))
-_env_file = os.path.join(_env_path, 'cache/env.pkl')
+_env_file = os.path.join(_env_path, 'env.pkl')
 _env_saved = os.path.exists(_env_file)
 _env_loaded = False
 logger = get_logger('FileIO')
@@ -123,7 +123,6 @@ class Env:
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.files['adc']
 
     def save(self):
-        #logger.info(f"Saving Trainer Environment to {self.filename}")
         with open(self.filename, 'wb') as f:
             pickle.dump(self, f)
     
@@ -131,7 +130,6 @@ class Env:
     def load(cls, filename):
         global _env_loaded
         if not _env_loaded:
-            #logger.info(f"Loading Cached Environment from {filename}")
             _env_loaded = True
         with open(filename, 'rb') as f:
             return pickle.load(f)
