@@ -9,7 +9,7 @@
 !pip install --upgrade file-io
 
 
-from file_io import File
+from fileio import File
 import json
 
 input_file = 'yourfile.json' # alternatively ['file1.json', 'file2.json']
