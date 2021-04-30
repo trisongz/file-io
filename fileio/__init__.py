@@ -280,7 +280,7 @@ class File(object):
 
     @classmethod
     def txtwrite(cls, data, filename, overwrite=False):
-        mode = File.writemode(filename, overwrite)
+        mode = 'w' if overwrite or not exists(filename) else 'a'
         with gfile(filename, mode) as f:
             if isinstance(data, list):
                 for d in data:
