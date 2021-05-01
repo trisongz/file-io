@@ -5,6 +5,7 @@ import csv
 import warnings
 import requests
 import gdown as gdownload
+import tempfile
 from tqdm.auto import tqdm
 from fileio.utils import lazy_import, logger, Auth
 
@@ -38,6 +39,7 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 enable_eager_execution = tf.compat.v1.enable_eager_execution
 disable_v2_behavior = tf.compat.v1.disable_v2_behavior
 
+_tmpdirs = []
 
 class File(object):
     @classmethod
@@ -87,6 +89,14 @@ class File(object):
     @classmethod
     def copy(cls, src, dest, overwrite=True):
         return gcopy(src, dest, overwrite)
+    
+    @classmethod
+    def bcopy(cls, src, directory, overwrite=True):
+        if not isdir(directory):
+            mkdirs(directory)
+        dest = os.path.join(directory, os.path.basename(src))
+        gcopy(src, dest, overwrite)
+        return dest
 
     @classmethod
     def exists(cls, filepath):
@@ -572,6 +582,44 @@ class File(object):
         if not path:
             return File.root
         return os.path.abspath(os.path.dirname(path))
+    
+    @classmethod
+    def is_cloud(cls, filename):
+        if filename.startswith('gs://'):
+            return (True, 'gcs')
+        if filename.startswith('s3://'):
+            return (True, 's3')
+        else:
+            return (False, None)
+    
+    @classmethod
+    def mktmp(cls, filename, overwrite=True):
+        global _tmpdirs
+        if _tmpdirs:
+            tmp_dir = _tmpdirs[-1]
+        else:
+            tmp_dir = tempfile.TemporaryDirectory()
+            _tmpdirs.append(tmp_dir)
+        return File.bcopy(filename, tmp_dir, overwrite)
+
+    @classmethod
+    def rmtmp(cls, mode='all'):
+        global _tmpdirs
+        _tmpmethods = ['all', 'first', 'last']
+        assert mode in _tmpmethods, 'Not available mode in [all, first, last]'
+        if mode == 'all':
+            for tmpdir in _tmpdirs:
+                tmpdir.cleanup()
+                #rmdir(tmpdir)
+            _tmpdirs = []
+        else:
+            pos = -1 if mode == 'last' else 0
+            tmpdir = _tmpdirs.pop(pos)
+            tmpdir.cleanup()
+            #rmdir(tmpdir)
+
+
+
 
 
 def iterator_function(function=None, **kwargs):
