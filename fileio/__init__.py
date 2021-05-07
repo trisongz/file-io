@@ -103,6 +103,18 @@ class File(object):
         return exists(filepath)
     
     @classmethod
+    def pexists(cls, path, *paths):
+        return exists(File.join(path, *paths))
+    
+    @classmethod
+    def whichpath(cls, path1, path2):
+        if exists(path1):
+            return path1
+        if exists(path2):
+            return path2
+        raise ValueError
+
+    @classmethod
     def base(cls, filepath):
         return os.path.basename(filepath)
 
