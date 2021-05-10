@@ -528,7 +528,7 @@ class File(object):
         return sum(1 for _ in tqdm(pipeline, desc='Getting Total Lines..'))
     
     @classmethod
-    def download(cls, url, dirpath=None, filename=None, overwrite=False):
+    def download(cls, url, dirpath=None, filename=None, overwrite=False, quiet=True):
         if not filename:
             filename = File.base(url)
         if dirpath:
@@ -538,7 +538,7 @@ class File(object):
             return
         rstream = requests.get(url, stream=True)
         with File.wb(filename) as f:
-            for chunk in tqdm(rstream.iter_content(chunk_size=1024), desc=f'Downloading {filename}'):
+            for chunk in tqdm(rstream.iter_content(chunk_size=1024), desc=f'Downloading {filename}', disable=quiet):
                 if not chunk:
                     break
                 f.write(chunk)
@@ -546,13 +546,13 @@ class File(object):
         f.close()
     
     @classmethod
-    def absdownload(cls, url, filepath, overwrite=False):
+    def absdownload(cls, url, filepath, overwrite=False, quiet=True):
         if File.exists(filepath) and not overwrite:
             logger.info(f'{filepath} exists and overwrite = False')
             return
         rstream = requests.get(url, stream=True)
         with File.wb(filepath) as f:
-            for chunk in tqdm(rstream.iter_content(chunk_size=1024), desc=f'Downloading {filepath}'):
+            for chunk in tqdm(rstream.iter_content(chunk_size=1024), desc=f'Downloading {filepath}', disable=quiet):
                 if not chunk:
                     break
                 f.write(chunk)
