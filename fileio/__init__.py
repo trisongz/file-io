@@ -546,6 +546,20 @@ class File(object):
         f.close()
     
     @classmethod
+    def absdownload(cls, url, filepath, overwrite=False):
+        if File.exists(filepath) and not overwrite:
+            logger.info(f'{filepath} exists and overwrite = False')
+            return
+        rstream = requests.get(url, stream=True)
+        with File.wb(filepath) as f:
+            for chunk in tqdm(rstream.iter_content(chunk_size=1024), desc=f'Downloading {filepath}'):
+                if not chunk:
+                    break
+                f.write(chunk)
+            f.flush()
+        f.close()
+
+    @classmethod
     def batch_download(cls, urls, directory=None, overwrite=False):
         if not directory:
             directory = curdir()
