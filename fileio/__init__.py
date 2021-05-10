@@ -95,7 +95,8 @@ class File(object):
         if not isdir(directory):
             mkdirs(directory)
         dest = os.path.join(directory, os.path.basename(src))
-        gcopy(src, dest, overwrite)
+        if not exists(dest) or overwrite:
+            gcopy(src, dest, overwrite)
         return dest
 
     @classmethod
