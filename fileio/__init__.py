@@ -459,6 +459,13 @@ class File(object):
         filenames = File.fsorter(filenames)
         for fname in filenames:
             yield File.jg(fname, handle_errors)
+    
+    @classmethod
+    def jsong(cls, filenames, handle_errors=True):
+        filenames = File.fsorter(filenames)
+        for fname in filenames:
+            yield File.jsonload(fname, handle_errors)
+    
 
     def __call__(self, filename, mode='r'):
         return self.open(filename, mode)
