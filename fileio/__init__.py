@@ -72,7 +72,10 @@ class File(object):
     
     @classmethod
     def getdir(cls, filepath):
-        return os.path.abspath(os.path.dirname(filepath))
+        if 'gs://' not in filepath:
+            return os.path.abspath(os.path.dirname(filepath))
+        fname = filepath.split('/')[-1]
+        return filepath.replace(fname, '').strip()
     
     @classmethod
     def isdir(cls, filepath):
@@ -100,7 +103,7 @@ class File(object):
     
     @classmethod
     def bcopy(cls, src, directory, overwrite=True):
-        if not isdir(directory):
+        if not exists(directory):
             mkdirs(directory)
         dest = os.path.join(directory, os.path.basename(src))
         if not exists(dest) or overwrite:
