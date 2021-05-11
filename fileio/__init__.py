@@ -52,7 +52,7 @@ class File(object):
 
     @classmethod
     def isfile(cls, filepath):
-        return isfile(filepath)
+        return os.path.isfile(filepath)
 
     @classmethod
     def listdir(cls, filepath):
@@ -69,6 +69,14 @@ class File(object):
     @classmethod
     def mkdirs(cls, filepath):
         return mkdirs(filepath)
+    
+    @classmethod
+    def getdir(cls, filepath):
+        return os.path.abspath(os.path.dirname(filepath))
+    
+    @classmethod
+    def isdir(cls, filepath):
+        return isdir(filepath)
 
     @classmethod
     def glob(cls, filepath):
