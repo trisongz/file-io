@@ -461,10 +461,14 @@ class File(object):
             yield File.jg(fname, handle_errors)
     
     @classmethod
-    def jsong(cls, filenames, handle_errors=True):
+    def jsong(cls, filenames):
         filenames = File.fsorter(filenames)
         for fname in filenames:
-            yield File.jsonload(fname, handle_errors)
+            try:
+                yield File.jsonload(fname)
+            except Exception as e:
+                print(f'Error Loading {fname}: {str(e)}')
+                yield None
     
 
     def __call__(self, filename, mode='r'):
