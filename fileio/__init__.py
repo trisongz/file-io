@@ -24,10 +24,17 @@ except ImportError:
     _torch_avail = False
     torchdevice = None
 
+try:
+    import gsutil as _gsutil
+except ImportError:
+    _gsutil = None
+    
+
+
 _tmpdirs = []
 _enable_pbar = False
 
-from .utils import lazy_import, logger, Auth, exec_command
+from .utils import lazy_import, lazy_install, logger, Auth, exec_command
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 gf = lazy_import('tensorflow.io.gfile')
@@ -72,7 +79,13 @@ def _set_print(name_or_func=None):
     else:
         _printer = logger.info
     
-
+def install_gsutil():
+    global _gsutil
+    if _gsutil:
+        return
+    lazy_install('gsutil')
+    exec_command('gcloud config set pass_credentials_to_gsutil')
+    import gsutil as _gsutil
 
 
 class File(object):
@@ -924,6 +937,8 @@ class File(object):
 
     @classmethod
     def gsutil(cls, cmd, multi=True):
+        if not _gsutil:
+            install_gsutil()
         if not cmd.startswith('gsutil'):
             cmd = 'gsutil ' + cmd
         if multi and not cmd.startswith('gsutil -m'):
