@@ -32,10 +32,10 @@ except ImportError:
 
 
 _tmpdirs = []
-_enable_pbar = False
+
 
 from ..utils import logger
-from ..utils.ops import lazy_import, lazy_install, Auth, exec_command
+from ..utils import lazy_import, lazy_install, Auth, exec_command, _enable_pbar
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 gf = lazy_import('tensorflow.io.gfile')
