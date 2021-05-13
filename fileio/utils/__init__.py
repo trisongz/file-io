@@ -10,6 +10,8 @@ from abc import abstractmethod
 from . import logger
 from .logger import get_logger
 
+from ..lib import _enable_pbar, tqdm
+
 root = os.path.abspath(os.path.dirname(__file__))
 logger = get_logger()
 
@@ -145,6 +147,6 @@ class Auth(object):
         json.dump(open(auth_file, 'w'), indent=2)
 
 
-from ..lib import File, _enable_pbar, tqdm
+from ..lib import File
 from .multi import MultiThreadPipeline
 from .ds import TFDSIODataset
