@@ -1,3 +1,5 @@
+from . import lib
+from . import utils
 
 from .lib import File, LineSeekableFile, iterator_function
 from .utils import MultiThreadPipeline, TFDSIODataset
