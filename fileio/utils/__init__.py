@@ -148,7 +148,6 @@ class Auth(object):
 
 
 #from fileio.lib import File
-from .. import lib
-from ..lib import File
+
 from .multi import MultiThreadPipeline
 from .ds import TFDSIODataset
