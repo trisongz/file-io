@@ -147,6 +147,8 @@ class Auth(object):
         json.dump(open(auth_file, 'w'), indent=2)
 
 
-from fileio.lib import File
+#from fileio.lib import File
+from .. import lib
+from ..lib import File
 from .multi import MultiThreadPipeline
 from .ds import TFDSIODataset
