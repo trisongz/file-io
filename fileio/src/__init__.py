@@ -29,10 +29,7 @@ try:
 except ImportError:
     _gsutil = None
     
-
-
 _tmpdirs = []
-
 
 from ..utils import logger
 from ..utils import lazy_import, lazy_install, Auth, exec_command, _enable_pbar
