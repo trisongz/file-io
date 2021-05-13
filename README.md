@@ -69,7 +69,7 @@ File.jgs(filenames)
 
 ### Changelogs
 
-May 12, 2021 - v0.0.9
+May 12, 2021 - v0.1.0
 - Refactored Library
 - Organized Methods
 - Added MultiThreaded Wrapper
