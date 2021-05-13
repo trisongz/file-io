@@ -20,7 +20,6 @@ deps = {
         'gdown',
         'requests',
         'pyyaml',
-        'hashlib',
         'pysimdjson',
         'tensorflow>=1.15.0',
     ],
