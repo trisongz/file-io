@@ -16,11 +16,13 @@ binary_names = _locals["binary_names"]
 
 deps = {
     'main': [
-        'pysimdjson',
         'tqdm',
-        'tensorflow>=1.15.0',
         'gdown',
         'requests',
+        'pyyaml',
+        'hashlib',
+        'pysimdjson',
+        'tensorflow>=1.15.0',
     ],
     'extras':{
         'gcp': ['google-api-python-client', 'google-compute-engine', 'google-cloud-storage', 'oauth2client'],

@@ -67,4 +67,78 @@ File.jgs(filenames)
 
 ```
 
-To be continued
+### Changelogs
+
+May 12, 2021 - v0.0.9
+- Refactored Library
+- Organized Methods
+- Added MultiThreaded Wrapper
+    - `from fileio import MultiThreadPipeline`
+- Added gsutil wrapper method
+    - File.gsutil
+- Added Methods for Yaml
+    - File.yload
+    - File.yloads
+    - File.ydump
+    - File.ydumps
+    - File.yparse
+- Updated Methods for Json
+    - File.jsonload
+    - File.jsonloads
+    - File.jsondump
+    - File.jsondumps
+    - File.jp
+    - File.jwrite
+    - File.jg
+    - File.jgs
+- Updated Methods for Jsonlines 
+    - File.jll
+    - File.jlp
+    - File.jldumps
+    - File.jlwrite
+    - File.jlwrites
+    - File.jlg
+    - File.jlgs
+    - File.jlload
+    - File.jlw
+    - File.jlsample
+- Updated Methods for Text
+    - File.textload
+    - File.textwrite
+    - File.textread
+    - File.textlist
+- Added Methods for Requests
+    - File.rget
+    - File.rpost
+    - File.reqsess
+- Added Methods for URL Encoding/Decoding
+    - File.urlencode
+    - File.urldecode
+- Added Methods for Hashing
+    - File.hash
+    - File.checkhash
+- Added Methods to Disable/Enable TQDM
+    - File.enable_progress
+    - File.disable_progress
+- Added Utility Methods
+    - File.cat
+    - File.backup
+    - File.findir
+    - File.append_ext
+    - File.copydir
+    - File.dirglob
+    - File.absdir
+    - File.get_local
+    - File.finalize
+    - File.print
+    - File.set_printer
+- Fixed/Updated Methods
+    - File.isfile
+    - File.download
+    - File.batch_download
+    - File.pexists
+    - File.whichpath
+    - File.copy
+    - File.bcopy
+- Added TFDSIODataset
+
