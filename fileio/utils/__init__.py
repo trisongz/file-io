@@ -144,5 +144,7 @@ class Auth(object):
     def save(cls, data):
         json.dump(open(auth_file, 'w'), indent=2)
 
+
+from ..lib import File, _enable_pbar, tqdm
 from .multi import MultiThreadPipeline
 from .ds import TFDSIODataset

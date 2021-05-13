@@ -1,7 +1,7 @@
 import time
 import multiprocessing as mp
 
-from . import logger, _enable_pbar, tqdm
+from ..lib import logger, _enable_pbar, tqdm
 
 _cores = mp.cpu_count()
 
