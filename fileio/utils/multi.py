@@ -2,7 +2,7 @@ import time
 import multiprocessing as mp
 from tqdm.auto import tqdm
 
-from ..lib import _enable_pbar
+from ..src import _enable_pbar
 from . import logger
 
 _cores = mp.cpu_count()

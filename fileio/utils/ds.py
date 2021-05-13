@@ -4,7 +4,7 @@ from typing import Any, List, Optional, Union, Callable, Dict
 
 
 from . import logger
-from ..lib import File
+from ..src import File
 
 _datacachedir = ''
 

@@ -10,7 +10,7 @@ from abc import abstractmethod
 from . import logging
 from .logging import get_logger
 
-from ..lib import _enable_pbar, tqdm
+from ..src import _enable_pbar, tqdm
 
 root = os.path.abspath(os.path.dirname(__file__))
 logger = get_logger()
