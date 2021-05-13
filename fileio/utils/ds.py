@@ -3,7 +3,8 @@ from dataclasses import dataclass, asdict, field
 from typing import Any, List, Optional, Union, Callable, Dict
 
 
-from ..lib import logger, File
+from . import logger
+from ..lib import File
 
 _datacachedir = ''
 

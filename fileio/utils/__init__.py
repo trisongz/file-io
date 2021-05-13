@@ -7,8 +7,8 @@ import pkg_resources
 import json
 from subprocess import check_output
 from abc import abstractmethod
-from . import logger
-from .logger import get_logger
+from . import logging
+from .logging import get_logger
 
 from ..lib import _enable_pbar, tqdm
 
