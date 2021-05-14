@@ -199,6 +199,14 @@ class File(object):
         return afilename
     
     @classmethod
+    def change_ext(cls, filepath, ext, directory=None):
+        filename = File.base(filepath)
+        ext_file = filename.split('.', 1)[0] + '.' + ext
+        if directory:
+            return File.join(directory, ext_file)
+        return ext_file
+
+    @classmethod
     def findir(cls, filepath, directory):
         filename = File.base(filepath)
         return File.pexists(directory, filename)
