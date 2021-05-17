@@ -150,6 +150,17 @@ class File(object):
     @classmethod
     def mv(cls, src, dest, overwrite=False):
         return mv(src, dest, overwrite)
+    
+    @classmethod
+    def fmv(cls, src, directory, overwrite=False):
+        dest = File.join(directory, File.base(src))
+        if not File.exists(dest) or overwrite:
+            logger.info(f'Moving File {src} -> {dest}')
+            File.mv(src, dest)
+        else:    
+            logger.error(f'Error: File Destination {dest} exists. Not Moving.')
+        return dest
+
 
     @classmethod
     def rm(cls, filename):
@@ -527,7 +538,7 @@ class File(object):
         with gfile(filename, mode) as f:
             for x, d in enumerate(data):
                 try:
-                    File.jldump(d, f)
+                    File.jldumps(d, f)
                     _good += 1
                 except StopIteration:
                     break
