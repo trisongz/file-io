@@ -68,6 +68,10 @@ File.jgs(filenames)
 ```
 
 ### Changelogs
+May 12, 2021 - v0.1.1
+- Minor Fixes
+- Added Method
+    - File.fmv
 
 May 12, 2021 - v0.1.0
 - Refactored Library
