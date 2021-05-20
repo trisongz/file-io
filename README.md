@@ -68,6 +68,9 @@ File.jgs(filenames)
 ```
 
 ### Changelogs
+May 20, 2021 - v0.1.4
+- Hotfix for file.split_file(s) method to also return resulting filenames with `output_files` key
+
 May 20, 2021 - v0.1.3
 - Py Version Requirement Fix
 

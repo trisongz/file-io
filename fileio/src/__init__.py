@@ -1046,7 +1046,7 @@ class File(object):
         logger.info(f'Split Sizes for {filename}: {split_data["split_sizes"]}.\nOutput Files: {out_fns}')
         data = split_data.pop('data')
 
-        res_meta = {'filename': filename}
+        res_meta = {'filename': filename, 'output_files': out_fns}
         res_meta.update(split_data)
         for split_key in split_dict:
             if output_format in ['jsonl', 'jsonlines', 'jl', 'jlines']:
@@ -1077,7 +1077,7 @@ class File(object):
         logger.info(f'Split Sizes for {len(filenames)} Files: {split_data["split_sizes"]}.\nOutput Files: {out_fns}')
         data = split_data.pop('data')
 
-        res_meta = {'filenames': filenames, 'total_files': len(filenames)}
+        res_meta = {'filenames': filenames, 'total_files': len(filenames), 'output_files': out_fns}
         res_meta.update(split_data)
 
         for split_key in split_dict:
