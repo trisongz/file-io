@@ -56,7 +56,7 @@ File.jsonload(filename)
 File.jsondump(dict, filename)
 
 # .jsonl/.jsonlines (Single File)
-File.jg(filename)
+File.jlg(filename)
 File.jlw(data, filename, mode='auto', verbose=True)
 
 # Multifile Readers
