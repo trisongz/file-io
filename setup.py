@@ -43,7 +43,7 @@ setup(
     author='Tri Songz',
     author_email='ts@growthengineai.com',
     url='http://github.com/trisongz/file_io',
-    python_requires='>3.6',
+    python_requires='>=3.6',
     install_requires=deps['main'],
     extras_require=deps['extras'],
     packages=packages,

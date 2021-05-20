@@ -68,6 +68,9 @@ File.jgs(filenames)
 ```
 
 ### Changelogs
+May 20, 2021 - v0.1.3
+- Py Version Requirement Fix
+
 May 19, 2021 - v0.1.2
 - Minor Fixes
 - Added Methods for Splitting Files/Items
