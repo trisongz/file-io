@@ -1031,7 +1031,9 @@ class File(object):
             random.shuffle(item_list)
         split_lens = list(split_sizes.values())
         data = [item_list[x - y: x] for x, y in zip(accumulate(split_lens), split_lens)]
-        return {'data': data, 'total_items': len(item_list),'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
+        total_split = sum(len(x) for x in data)
+        data = {k: data[x] for x, k in enumerate(split_dict) if len(data[x]) == split_sizes[f'{k}_items']}
+        return {'data': data, 'total_items': len(item_list), 'total_split_items': total_split, 'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
 
 
     @classmethod
@@ -1046,10 +1048,9 @@ class File(object):
 
         res_meta = {'filename': filename}
         res_meta.update(split_data)
-
-        for x, split_key in enumerate(split_dict):
+        for split_key in split_dict:
             if output_format in ['jsonl', 'jsonlines', 'jl', 'jlines']:
-                File.jlwrites(data[x], out_fns[split_key], mode='w')
+                File.jlwrites(data[split_key], out_fns[split_key], mode='w')
             
             else:
                 logger.error(f'Format {output_format} is not supported')
@@ -1079,9 +1080,9 @@ class File(object):
         res_meta = {'filenames': filenames, 'total_files': len(filenames)}
         res_meta.update(split_data)
 
-        for x, split_key in enumerate(split_dict):
+        for split_key in split_dict:
             if output_format in ['jsonl', 'jsonlines', 'jl', 'jlines']:
-                File.jlwrites(data[x], out_fns[split_key], mode='w')
+                File.jlwrites(data[split_key], out_fns[split_key], mode='w')
             
             else:
                 logger.error(f'Format {output_format} is not supported')
