@@ -9,3 +9,4 @@ build.sh
 *dist
 *build
 workspace.code-workspace
+.DS_Store

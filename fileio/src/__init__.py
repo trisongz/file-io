@@ -6,7 +6,7 @@ import warnings
 import requests
 import tempfile
 import types
-
+import math
 import hashlib
 import random
 import gdown as gdownload
@@ -15,6 +15,7 @@ import simdjson as json
 from tqdm.auto import tqdm
 from pprint import pprint
 from datetime import datetime, timedelta, timezone
+from itertools import islice, accumulate
 
 try:
     import torch
@@ -24,11 +25,7 @@ except ImportError:
     _torch_avail = False
     torchdevice = None
 
-try:
-    import gsutil as _gsutil
-except ImportError:
-    _gsutil = None
-    
+_gsutil = None
 _tmpdirs = []
 
 from ..utils import logger
@@ -81,10 +78,14 @@ def install_gsutil():
     global _gsutil
     if _gsutil:
         return
-    lazy_install('gsutil')
+    if exec_command('gsutil') == '':
+        lazy_install('gsutil')
     exec_command('gcloud config set pass_credentials_to_gsutil')
-    import gsutil as _gsutil
+    _gsutil = True
 
+def check_gsutil():
+    if not _gsutil:
+        install_gsutil()
 
 class File(object):
     @classmethod
@@ -202,9 +203,11 @@ class File(object):
         return [File.bcopy(fname, dest_dir, overwrite, verbose=True) for fname in filenames]
 
     @classmethod
-    def append_ext(cls, filepath, append_key, directory=None):
+    def append_ext(cls, filepath, append_key, directory=None, fext=None):
         filename = File.base(filepath)
         afilename = filename.replace('.', f'_{append_key}.')
+        if fext:
+            afilename = afilename.rsplit('.', 1)[0] + f'.{fext}'
         if directory:
             return File.join(directory, afilename)
         return afilename
@@ -954,8 +957,7 @@ class File(object):
 
     @classmethod
     def gsutil(cls, cmd, multi=True):
-        if not _gsutil:
-            install_gsutil()
+        check_gsutil()
         if not cmd.startswith('gsutil'):
             cmd = 'gsutil ' + cmd
         if multi and not cmd.startswith('gsutil -m'):
@@ -1006,6 +1008,88 @@ class File(object):
             lpath = File.bcopy(fpath, directory, overwrite=False)
             lpaths.append(lpath)
         return lpaths
+    
+    @classmethod
+    def calc_splits(cls, num_items, split_dict):
+        if sum(list(split_dict.values())) > 1:
+            res = {f'{k}_items': math.ceil(num_items / v) for k,v in split_dict.items()}        
+        else:
+            assert sum(list(split_dict.values())) <= 1.0
+            res = {f'{k}_items': math.ceil(num_items * v) for k,v in split_dict.items()}
+        while sum(list(res.values())) > num_items:
+            for k,v in res.items():
+                res[k] -= 1
+                if sum(list(res.values())) <= num_items:
+                    break
+        return res
+
+    @classmethod
+    def split_items(cls, item_list, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, shuffle=True):
+        split_sizes = File.calc_splits(len(item_list), split_dict)
+        if shuffle:
+            logger.info(f'Shuffling Data')
+            random.shuffle(item_list)
+        split_lens = list(split_sizes.values())
+        data = [item_list[x - y: x] for x, y in zip(accumulate(split_lens), split_lens)]
+        return {'data': data, 'total_items': len(item_list),'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
+
+
+    @classmethod
+    def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
+        items = [ex for ex in File.load(filename)]
+        out_fns = {k: File.append_ext(filename, k, directory) for k in list(split_dict.keys())}
+        out_fns['results'] = File.append_ext(filename, 'results', directory, 'json')
+        split_data = File.split_items(items, split_dict, shuffle)
+
+        logger.info(f'Split Sizes for {filename}: {split_data["split_sizes"]}.\nOutput Files: {out_fns}')
+        data = split_data.pop('data')
+
+        res_meta = {'filename': filename}
+        res_meta.update(split_data)
+
+        for x, split_key in enumerate(split_dict):
+            if output_format in ['jsonl', 'jsonlines', 'jl', 'jlines']:
+                File.jlwrites(data[x], out_fns[split_key], mode='w')
+            
+            else:
+                logger.error(f'Format {output_format} is not supported')
+                assert ValueError
+            
+        logger.info(f'Final Metadata: {res_meta}')
+        File.jsondump(res_meta, out_fns['results'])
+        return res_meta
+
+    @classmethod
+    def split_files(cls, filenames, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', merge_files=False, dataset_name=None, directory=None, shuffle=True):
+        if not merge_files:
+            for fname in filenames:
+                yield File.split_file(fname, split_dict=split_dict, output_format=output_format, directory=directory, shuffle=shuffle)
+            return
+        assert dataset_name, 'Dataset must have a name'
+        assert directory, 'Directory must be set'
+        assert output_format == 'jsonl', 'Format must be Jsonl'
+        items = [ex for ex in File.load(filenames)]
+
+        out_fns = {k: File.join(directory, f'{dataset_name}_{k}.jsonl') for k in list(split_dict.keys())}
+        out_fns['results'] = File.join(directory, f'{dataset_name}_results.json')
+        split_data = File.split_items(items, split_dict, shuffle)
+        logger.info(f'Split Sizes for {len(filenames)} Files: {split_data["split_sizes"]}.\nOutput Files: {out_fns}')
+        data = split_data.pop('data')
+
+        res_meta = {'filenames': filenames, 'total_files': len(filenames)}
+        res_meta.update(split_data)
+
+        for x, split_key in enumerate(split_dict):
+            if output_format in ['jsonl', 'jsonlines', 'jl', 'jlines']:
+                File.jlwrites(data[x], out_fns[split_key], mode='w')
+            
+            else:
+                logger.error(f'Format {output_format} is not supported')
+                assert ValueError
+            
+        logger.info(f'Final Metadata: {res_meta}')
+        File.jsondump(res_meta, out_fns['results'])
+        return res_meta
 
 
     def __call__(self, filename, mode='r'):

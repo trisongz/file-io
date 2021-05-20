@@ -68,6 +68,14 @@ File.jgs(filenames)
 ```
 
 ### Changelogs
+May 19, 2021 - v0.1.2
+- Minor Fixes
+- Added Methods for Splitting Files/Items
+    - File.calc_splits
+    - File.split_items
+    - File.split_file
+    - File.split_files
+
 May 12, 2021 - v0.1.1
 - Minor Fixes
 - Added Method
