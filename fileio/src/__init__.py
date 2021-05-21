@@ -203,9 +203,11 @@ class File(object):
         return [File.bcopy(fname, dest_dir, overwrite, verbose=True) for fname in filenames]
 
     @classmethod
-    def append_ext(cls, filepath, append_key, directory=None, fext=None):
+    def append_ext(cls, filepath, append_key, directory=None, fext=None, abs=True):
         filename = File.base(filepath)
         afilename = filename.replace('.', f'_{append_key}.')
+        if abs:
+            directory = File.getdir(filepath)
         if fext:
             afilename = afilename.rsplit('.', 1)[0] + f'.{fext}'
         if directory:
@@ -1001,11 +1003,11 @@ class File(object):
             File.copy(src_dict[key], dest_dict[key], overwrite=overwrite)
     
     @classmethod
-    def get_local(cls, filenames, directory='/content/data'):
+    def get_local(cls, filenames, directory='/content/data', ovewrite=False):
         filenames = File.fsorter(filenames)
         lpaths = []
         for fpath in filenames:
-            lpath = File.bcopy(fpath, directory, overwrite=False)
+            lpath = File.bcopy(fpath, directory, overwrite=ovewrite)
             lpaths.append(lpath)
         return lpaths
     
@@ -1038,7 +1040,8 @@ class File(object):
 
     @classmethod
     def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
-        items = [ex for ex in File.load(filename)]
+        iterator = File.load(filename)
+        items = [ex for ex in iterator]
         out_fns = {k: File.append_ext(filename, k, directory) for k in list(split_dict.keys())}
         out_fns['results'] = File.append_ext(filename, 'results', directory, 'json')
         split_data = File.split_items(items, split_dict, shuffle)
