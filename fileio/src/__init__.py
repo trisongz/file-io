@@ -388,6 +388,7 @@ class File(object):
             
             else:
                 logger.info(f'Unrecognized File Extension: {filename}')
+        return
 
     
     @classmethod
@@ -1041,7 +1042,10 @@ class File(object):
     @classmethod
     def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
         iterator = File.load(filename)
-        items = [ex for ex in iterator]
+        items = []
+        for ex in iterator:
+            items.append(ex)
+        #items = [ex for ex in iterator]
         out_fns = {k: File.append_ext(filename, k, directory) for k in list(split_dict.keys())}
         out_fns['results'] = File.append_ext(filename, 'results', directory, 'json')
         split_data = File.split_items(items, split_dict, shuffle)
