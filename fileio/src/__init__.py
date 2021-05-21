@@ -1041,7 +1041,8 @@ class File(object):
 
     @classmethod
     def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
-        iterator = File.load(filename)
+        #iterator = File.load(filename)
+        iterator = File.jlg(filename)
         items = []
         for ex in iterator:
             items.append(ex)
