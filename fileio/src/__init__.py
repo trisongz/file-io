@@ -363,7 +363,8 @@ class File(object):
                 yield File.pload(filename)
             
             elif filename.endswith('.jsonl') or filename.endswith('.jsonlines'):
-                yield File.jlg(filename)
+                iterator = File.jlg(filename)
+                yield from iterator
             
             elif filename.endswith('.json'):
                 yield File.jsonload(filename)
@@ -372,7 +373,8 @@ class File(object):
                 yield File.ptload(filename, device)
             
             elif filename.endswith('.txt'):
-                yield File.textload(filename)
+                iterator = File.textload(filename)
+                yield from iterator
             
             elif filename.endswith('.csv'):
                 try:
@@ -1041,8 +1043,8 @@ class File(object):
 
     @classmethod
     def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
-        #iterator = File.load(filename)
-        iterator = File.jlg(filename)
+        iterator = File.load(filename)
+        #iterator = File.jlg(filename)
         items = []
         for ex in iterator:
             items.append(ex)
