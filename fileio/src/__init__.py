@@ -638,7 +638,29 @@ class File(object):
     @classmethod
     def tsvreader(cls, f):
         return csv.DictReader(f, delimiter='\t')
+    
+    @classmethod
+    def csvwrite(cls, data, filename, mode='auto', keys=None, delimiter=','):
+        mode = mode if mode != 'auto' else File.autowrite(filename)
+        _is_dict = False
+        if isinstance(data, dict):
+            keys = keys or list(data.keys())
+            _is_dict = True
+        
+        elif isinstance(data, list):
+            if isinstance(data[0], dict):
+                _is_dict = True
+                keys = keys or list(data[0].keys())
 
+        with gfile(filename, mode) as f:
+            writer = csv.DictWriter(f, keys, delimiter=delimiter) if _is_dict else csv.writer(f, delimiter=delimiter)
+            if keys and mode != 'a':
+                writer.writeheader()
+            writer.writerows(data)
+    
+    @classmethod
+    def tsvwrite(cls, data, filename, mode='auto', keys=None):
+        return File.csvwrite(data, filename, mode, keys, delimiter='\t')
 
     # Text Lines Methods
     @classmethod
