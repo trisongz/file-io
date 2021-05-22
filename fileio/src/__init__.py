@@ -105,6 +105,10 @@ class File(object):
     @classmethod
     def listdir(cls, filepath):
         return listdir(filepath)
+    
+    @classmethod
+    def curdir(cls):
+        return curdir()
 
     @classmethod
     def mkdir(cls, directory):
