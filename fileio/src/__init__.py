@@ -47,6 +47,7 @@ rm = gf.remove
 jparser = json.Parser()
 cd = os.chdir
 curdir = os.getcwd
+usrdir = os.path.expanduser("~")
 
 tf = lazy_import('tensorflow')
 TextLineDataset = tf.data.TextLineDataset
@@ -121,6 +122,12 @@ class File(object):
     @classmethod
     def mkdirs(cls, directory):
         return mkdirs(directory)
+    
+    @classmethod
+    def userdir(cls, path=None, *paths):
+        if not path:
+            return usrdir
+        return os.path.join(usrdir, path, *paths)
     
     @classmethod
     def getdir(cls, filepath):
