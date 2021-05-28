@@ -68,6 +68,10 @@ File.jgs(filenames)
 ```
 
 ### Changelogs
+May 28, 2021 - v0.1.6
+- Added Method to get User Dir
+    - File.userdir
+
 May 21, 2021 - v0.1.5
 - Added TSV/CSV Write Methods
     - File.csvwrite

@@ -124,10 +124,14 @@ class File(object):
         return mkdirs(directory)
     
     @classmethod
-    def userdir(cls, path=None, *paths):
+    def userdir(cls, path=None, *paths, **kwargs):
         if not path:
             return usrdir
-        return os.path.join(usrdir, path, *paths)
+        _dir = os.path.join(usrdir, path, *paths)
+        for k in ['mkdir', 'mkdirs', 'makedir', 'makedirs']:
+            if kwargs.get(k):
+                mkdirs(_dir)
+        return _dir
     
     @classmethod
     def getdir(cls, filepath):
