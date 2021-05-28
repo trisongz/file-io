@@ -1043,11 +1043,13 @@ class File(object):
             File.copy(src_dict[key], dest_dict[key], overwrite=overwrite)
     
     @classmethod
-    def get_local(cls, filenames, directory='/content/data', ovewrite=False):
+    def get_local(cls, filenames, directory=None, overwrite=False):
+        if not directory:
+            directory = File.join(curdir(), 'data')
         filenames = File.fsorter(filenames)
         lpaths = []
         for fpath in filenames:
-            lpath = File.bcopy(fpath, directory, overwrite=ovewrite)
+            lpath = File.bcopy(fpath, directory, overwrite=overwrite)
             lpaths.append(lpath)
         return lpaths
     
