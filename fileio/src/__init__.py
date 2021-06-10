@@ -11,6 +11,7 @@ import hashlib
 import random
 import gdown as gdownload
 import simdjson as json
+import gc
 
 from tqdm.auto import tqdm
 from pprint import pprint
@@ -1078,15 +1079,64 @@ class File(object):
         total_split = sum(len(x) for x in data)
         data = {k: data[x] for x, k in enumerate(split_dict) if len(data[x]) == split_sizes[f'{k}_items']}
         return {'data': data, 'total_items': len(item_list), 'total_split_items': total_split, 'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
+    
+    @classmethod
+    def lazy_split_items(cls, lazy_iterator, split_dict={'train': 0.85, 'val': 0.10, 'test': 0.05}, shuffle=True):
+        split_sizes = File.calc_splits(len(lazy_iterator), split_dict)
+        item_idx = lazy_iterator.get_index()
+        if shuffle:
+            logger.info(f'Shuffling Data')
+            random.shuffle(item_idx)
+        split_lens = list(split_sizes.values())
+        data_idx = [item_idx[x - y: x] for x, y in zip(accumulate(split_lens), split_lens)]
+        total_split = sum(len(x) for x in data_idx)
+        data = []
+        for idx in data_idx:
+            items = [lazy_iterator[i] for i in idx]
+            data.append(items)
+        data = {k: data[x] for x, k in enumerate(split_dict) if len(data[x]) == split_sizes[f'{k}_items']}
+        return {'data': data, 'total_items': len(lazy_iterator), 'total_split_items': total_split, 'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
+
+    @classmethod
+    def lazy_split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.10, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
+        logger.info('Using Lazy Iterator')
+        lazy_iterator = LineSeekableFile(File.read(filename))
+        logger.info(f'Lazy Iterator Items: {len(lazy_iterator)}')
+        out_fns = {k: File.append_ext(filename, k, directory=directory, abs=bool(not directory)) for k in list(split_dict.keys())}
+        out_fns['results'] = File.append_ext(filename, 'results', directory=directory, fext='json', abs=bool(not directory))
+        split_sizes = File.calc_splits(len(lazy_iterator), split_dict)
+        item_idx = lazy_iterator.get_index()
+        if shuffle:
+            logger.info(f'Shuffling Data')
+            random.shuffle(item_idx)
+        split_lens = list(split_sizes.values())
+        data_idx = [item_idx[x - y: x] for x, y in zip(accumulate(split_lens), split_lens)]
+        total_split = sum(len(x) for x in data_idx)
+        data_idx = {k: data_idx[x] for x, k in enumerate(split_dict) if len(data_idx[x]) == split_sizes[f'{k}_items']}
+        split_data = {'total_items': len(lazy_iterator), 'total_split_items': total_split, 'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
+        logger.info(f'Split Sizes for {filename}: {split_data["split_sizes"]}.\nOutput Files: {out_fns}')
+
+        res_meta = {'filename': filename, 'output_files': out_fns}
+        res_meta.update(split_data)
+        for split_key in split_dict:
+            items = [lazy_iterator[i] for i in data_idx[split_key]]
+            if output_format in ['jsonl', 'jsonlines', 'jl', 'jlines']:
+                File.jlwrites(items, out_fns[split_key], mode='w')
+            
+            else:
+                logger.error(f'Format {output_format} is not supported')
+                assert ValueError
+            del items
+            gc.collect()
+            
+        logger.info(f'Final Metadata: {res_meta}')
+        File.jsondump(res_meta, out_fns['results'])
+        return res_meta
 
 
     @classmethod
     def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.10, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
-        #iterator = File.load(filename)
         iterator = File.jlg(filename)
-        #items = []
-        #for ex in iterator:
-        #    items.append(ex)
         items = [ex for ex in iterator]
         out_fns = {k: File.append_ext(filename, k, directory=directory, abs=bool(not directory)) for k in list(split_dict.keys())}
         out_fns['results'] = File.append_ext(filename, 'results', directory=directory, fext='json', abs=bool(not directory))
@@ -1167,7 +1217,11 @@ class LineSeekableFile:
         while seekable.readline():
             self.line_map.append(seekable.tell())
 
+    @property
     def index(self):
+        return self.line_map
+    
+    def get_index(self):
         return self.line_map
     
     def __len__(self):
