@@ -1055,7 +1055,7 @@ class File(object):
     
     @classmethod
     def calc_splits(cls, num_items, split_dict):
-        if sum(list(split_dict.values())) > 1:
+        if sum(list(split_dict.values())) > 1.0:
             res = {f'{k}_items': math.ceil(num_items / v) for k,v in split_dict.items()}        
         else:
             assert sum(list(split_dict.values())) <= 1.0
@@ -1076,20 +1076,20 @@ class File(object):
         split_lens = list(split_sizes.values())
         data = [item_list[x - y: x] for x, y in zip(accumulate(split_lens), split_lens)]
         total_split = sum(len(x) for x in data)
-        data = {k: data[x] for x, k in enumerate(split_dict) if len(data[x]) == split_sizes[f'{k}_items']}
+        data = {k: data[x] for x, k in enumerate(split_dict)}# if len(data[x]) == split_sizes[f'{k}_items']}
         return {'data': data, 'total_items': len(item_list), 'total_split_items': total_split, 'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
 
 
     @classmethod
     def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
-        iterator = File.load(filename)
-        #iterator = File.jlg(filename)
-        items = []
-        for ex in iterator:
-            items.append(ex)
-        #items = [ex for ex in iterator]
-        out_fns = {k: File.append_ext(filename, k, directory) for k in list(split_dict.keys())}
-        out_fns['results'] = File.append_ext(filename, 'results', directory, 'json')
+        #iterator = File.load(filename)
+        iterator = File.jlg(filename)
+        #items = []
+        #for ex in iterator:
+        #    items.append(ex)
+        items = [ex for ex in iterator]
+        out_fns = {k: File.append_ext(filename, k, directory=directory, abs=bool(not directory)) for k in list(split_dict.keys())}
+        out_fns['results'] = File.append_ext(filename, 'results', directory=directory, fext='json', abs=bool(not directory))
         split_data = File.split_items(items, split_dict, shuffle)
 
         logger.info(f'Split Sizes for {filename}: {split_data["split_sizes"]}.\nOutput Files: {out_fns}')
