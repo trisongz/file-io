@@ -1068,7 +1068,7 @@ class File(object):
         return res
 
     @classmethod
-    def split_items(cls, item_list, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, shuffle=True):
+    def split_items(cls, item_list, split_dict={'train': 0.85, 'val': 0.10, 'test': 0.05}, shuffle=True):
         split_sizes = File.calc_splits(len(item_list), split_dict)
         if shuffle:
             logger.info(f'Shuffling Data')
@@ -1076,12 +1076,12 @@ class File(object):
         split_lens = list(split_sizes.values())
         data = [item_list[x - y: x] for x, y in zip(accumulate(split_lens), split_lens)]
         total_split = sum(len(x) for x in data)
-        data = {k: data[x] for x, k in enumerate(split_dict)}# if len(data[x]) == split_sizes[f'{k}_items']}
+        data = {k: data[x] for x, k in enumerate(split_dict) if len(data[x]) == split_sizes[f'{k}_items']}
         return {'data': data, 'total_items': len(item_list), 'total_split_items': total_split, 'split_dict': split_dict, 'split_lengths': split_lens, 'split_sizes': split_sizes, 'shuffled': shuffle}
 
 
     @classmethod
-    def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.15, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
+    def split_file(cls, filename, split_dict={'train': 0.85, 'val': 0.10, 'test': 0.05}, output_format='jsonl', directory=None, shuffle=True):
         #iterator = File.load(filename)
         iterator = File.jlg(filename)
         #items = []
