@@ -536,7 +536,7 @@ class File(object):
     def jlgs(cls, filenames, handle_errors=True):
         filenames = File.fsorter(filenames)
         for fname in filenames:
-            yield File.jlg(fname, handle_errors)
+            yield from File.jlg(fname, handle_errors)
     
 
     @classmethod

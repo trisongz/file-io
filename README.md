@@ -68,8 +68,9 @@ File.jgs(filenames)
 ```
 
 ### Changelogs
-May 28, 2021 - v0.1.7
+June 9, 2021 - v0.1.7
 - Hotfix for Method .get_local
+- Hotfix for method .jlgs
 
 May 28, 2021 - v0.1.6
 - Added Method to get User Dir
