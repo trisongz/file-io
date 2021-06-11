@@ -66,6 +66,9 @@ File.jgs(filenames)
 
 
 ```
+### Changelogs
+June 11, 2021 - v0.1.8
+- Hotfix for methods .split_file/.split_files
 
 ### Changelogs
 June 9, 2021 - v0.1.7
