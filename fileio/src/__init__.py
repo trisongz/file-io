@@ -26,6 +26,12 @@ except ImportError:
     _torch_avail = False
     torchdevice = None
 
+try:
+    import dill
+    _dill_avail = True
+except ImportError:
+    _dill_avail = False
+
 _gsutil = None
 _tmpdirs = []
 
@@ -61,6 +67,33 @@ timestamp = lambda: datetime.now(timezone.utc).isoformat('T')
 ftimestamp = lambda: datetime.now(timezone.utc).strftime("%b%d%Y_TM_%H%M%S")
 
 _printer = pprint
+_pickler = pickle
+_picklers = ['dill', 'pickle', 'pkl']
+if _dill_avail:
+    _pickler = dill
+
+def _set_pickler(name='dill'):
+    global _pickler
+    if name not in _picklers:
+        try:
+            _picklemethod = lazy_import(name)
+            _pickler = _picklemethod
+            logger.info(f'Set Pickle Method to {name}')
+            return
+        except ImportError:
+            logger.error(f'Unable to import {name}')
+        raise ValueError(f'{name} not a valid option: {_picklers}')
+    if name == 'dill':
+        assert _dill_avail, 'Dill is not currently installed to be used'
+        _pickler = dill
+        logger.info('Set Pickle Method as Dill')
+        return
+    if name in ['pickle', 'pkl']:
+        _pickler = pickle
+        logger.info('Set Pickle Method as Default Pickle')
+        return
+
+
 
 def _set_print(name_or_func=None):
     global _printer
@@ -597,11 +630,11 @@ class File(object):
     # Pickle Methods
     @classmethod
     def pklsave(cls, obj, filename):
-        return pickle.dump(obj, gfile(filename, 'wb'))
+        return _pickler.dump(obj, gfile(filename, 'wb'))
 
     @classmethod
     def pklload(cls, filename):
-        return pickle.load(gfile(filename, 'rb'))
+        return _pickler.load(gfile(filename, 'rb'))
     
     @classmethod
     def pload(cls, filename):
@@ -970,6 +1003,17 @@ class File(object):
     @classmethod
     def set_printer(cls, name_or_func):
         _set_print(name_or_func)
+    
+    @classmethod
+    def set_pickler(cls, name='pickle', auto=True):
+        if name == 'dill' and auto and not _dill_avail:
+            lazy_install('dill')
+        elif name not in _picklers and auto:
+            try:
+                lazy_install(name)
+            except Exception as e:
+                raise ValueError(f'Error in trying to autoinstall {name}: {str(e)}')
+        _set_pickler(name)
     
 
     @classmethod
