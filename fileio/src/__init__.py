@@ -72,8 +72,14 @@ _picklers = ['dill', 'pickle', 'pkl']
 if _dill_avail:
     _pickler = dill
 
-def _set_pickler(name='dill'):
+
+
+def _set_pickler(function=None, name='dill'):
     global _pickler
+    if function:
+        logger.info(f'Setting Pickle method to Function. Assuming valid loads/dumps support')
+        _pickler = function
+        return
     if name not in _picklers:
         try:
             _picklemethod = lazy_import(name)
@@ -629,20 +635,27 @@ class File(object):
 
     # Pickle Methods
     @classmethod
-    def pklsave(cls, obj, filename):
-        return _pickler.dump(obj, gfile(filename, 'wb'))
+    def pklsave(cls, obj, filename, **kwargs):
+        data = _pickler.dumps(obj, **kwargs)
+        with gfile(filename, 'wb') as f:
+            f.write(data)
+            f.flush()
+        #return _pickler.dump(obj, gfile(filename, 'wb'))
 
     @classmethod
-    def pklload(cls, filename):
-        return _pickler.load(gfile(filename, 'rb'))
+    def pklload(cls, filename, **kwargs):
+        with gfile(filename, 'rb') as f:
+            data = _pickler.loads(f.read(), **kwargs)
+        return data
+        #return _pickler.load(gfile(filename, 'rb'))
     
     @classmethod
-    def pload(cls, filename):
+    def pload(cls, filename, **kwargs):
         return File.pklload(filename)
     
     @classmethod
-    def psave(cls, filename):
-        return File.pklsave(filename)
+    def psave(cls, filename, **kwargs):
+        return File.pklsave(filename, **kwargs)
 
     # Torch Methods
     @classmethod
@@ -1005,7 +1018,10 @@ class File(object):
         _set_print(name_or_func)
     
     @classmethod
-    def set_pickler(cls, name='pickle', auto=True):
+    def set_pickler(cls, function=None, name='pickle', auto=True):
+        if function:
+            _set_pickler(function=function)
+            return
         if name == 'dill' and auto and not _dill_avail:
             lazy_install('dill')
         elif name not in _picklers and auto:
@@ -1013,7 +1029,7 @@ class File(object):
                 lazy_install(name)
             except Exception as e:
                 raise ValueError(f'Error in trying to autoinstall {name}: {str(e)}')
-        _set_pickler(name)
+        _set_pickler(name=name)
     
 
     @classmethod

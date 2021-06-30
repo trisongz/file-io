@@ -67,9 +67,10 @@ File.jgs(filenames)
 
 ```
 ### Changelogs
-June 30, 2021 - v0.1.9
+June 30, 2021 - v0.1.10
 - Added Dill as default pickler if installed
-- Ability to set any pickle method that supports .dump/.load call with `File.set_pickler(name='pickler')`
+- Ability to set any pickle method that supports .dumps/.loads call with `File.set_pickler(name='pickler')`
+- Hotfix to change method to dumps/loads
 
 June 11, 2021 - v0.1.8
 - Hotfix for methods .split_file/.split_files
