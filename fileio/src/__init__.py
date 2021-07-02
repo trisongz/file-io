@@ -121,7 +121,7 @@ def install_gsutil():
         return
     if exec_command('gsutil') == '':
         lazy_install('gsutil')
-    exec_command('gcloud config set pass_credentials_to_gsutil')
+    exec_command('gcloud config set pass_credentials_to_gsutil false')
     _gsutil = True
 
 def check_gsutil():
