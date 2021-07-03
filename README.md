@@ -80,6 +80,9 @@ July 2, 2021 - v0.1.12
     - `replacements: [ list | dict | str ] = None`, will iterate through and replace
 - Add `.readfile` method to return `.read()` API
 - Add `.mod_fname(filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False)`
+    - `src = 'gs://mybucket/path/file.txt'`
+    - `res = File.mod_fname(src, newname='newfile', ext='json', directory='/newdir', prefix='test_', suffix='_001')`
+    - `>> res = /newdir/test_newfile_001.json`
 
 June 30, 2021 - v0.1.11
 - Added Dill as default pickler if installed

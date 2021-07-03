@@ -279,22 +279,22 @@ class File(object):
         return ext_file
 
     @classmethod
-    def mod_fname(cls, filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False):
+    def mod_fname(cls, filename, newname=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False):
         basefname = File.base(filename)
         basesplit = basefname.split('.', 1)
         basenoext = basesplit[0]
-        fname = basenoext if not new_name else new_name
-        if not ext:
-            if new_name and '.' in new_name:
-                ext = File.ext(new_name)
-                fname = new_name.replace(ext, '')
-            else:
-                ext = File.ext(filename)
-        #if new_name and '.' in new_name:
-        #    fname = new_name.split('.', 1)[0]
+        fname = basenoext if not newname else newname
+        if ext:
+            if '.' not in ext: ext = '.' + ext
+            if ext in fname: fname = fname.replace(ext, '')
+        elif newname and '.' in newname:
+            ext = File.ext(newname)
+            fname = newname.replace(ext, '')
+        else:
+            ext = File.ext(filename)
         if prefix: fname = prefix + fname
         if suffix: fname += suffix
-        fullname = fname + '.' + ext
+        fullname = fname + ext
         if filename_only:
             return fullname
         directory = directory or File.getdir(filename)
