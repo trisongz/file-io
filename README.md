@@ -66,11 +66,17 @@ File.jgs(filenames)
 
 
 ```
+### Upcoming Changes / APIs
+- Support for setting JSON serializer [`simdjson` by default]
+- Support for Google Sheets manipulation [`gspread`]
+- Support for compressed files [`.zst`,  `.zip`, `.tar`, `.gz`, `.tar.gz`]
+
 ### Changelogs
-June 30, 2021 - v0.1.10
+June 30, 2021 - v0.1.11
 - Added Dill as default pickler if installed
-- Ability to set any pickle method that supports .dumps/.loads call with `File.set_pickler(name='pickler')`
+- Ability to set any pickle method that supports .dumps/.loads call with `File.set_pickler(name='pickler')` or `File.set_pickler(function=cloudpickle)`
 - Hotfix to change method to dumps/loads
+- Hotfix for .gsutil method which did not initialize properly.
 
 June 11, 2021 - v0.1.8
 - Hotfix for methods .split_file/.split_files
