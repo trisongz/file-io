@@ -343,8 +343,12 @@ class File(object):
         raise ValueError
 
     @classmethod
-    def base(cls, filepath):
-        return os.path.basename(filepath)
+    def base(cls, filepath, with_ext=True):
+        f = os.path.basename(filepath)
+        if with_ext:
+            return f
+        _, e = os.path.splitext(f)
+        return f.replace(e, '')
 
     @classmethod
     def ext(cls, filepath):

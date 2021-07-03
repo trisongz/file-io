@@ -72,17 +72,19 @@ File.jgs(filenames)
 - Support for compressed files [`.zst`,  `.zip`, `.tar`, `.gz`, `.tar.gz`]
 
 ### Changelogs
-July 2, 2021 - v0.1.12
+July 2, 2021 - v0.1.13
 - Change `.textread` to return string rather than list
     - `.textreadlines` replaces original function
 - Update `.textlist` to support option for stripping newlines and have replacements
     - `strip_newlines = True`, will strip all newlines prior to return
     - `replacements: [ list | dict | str ] = None`, will iterate through and replace
+- Update `.base(filename, with_ext=True)` to allow return without File Extension
 - Add `.readfile` method to return `.read()` API
 - Add `.mod_fname(filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False)`
     - `src = 'gs://mybucket/path/file.txt'`
     - `res = File.mod_fname(src, newname='newfile', ext='json', directory='/newdir', prefix='test_', suffix='_001')`
     - `>> res = /newdir/test_newfile_001.json`
+
 
 June 30, 2021 - v0.1.11
 - Added Dill as default pickler if installed
