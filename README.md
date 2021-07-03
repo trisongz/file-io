@@ -72,6 +72,15 @@ File.jgs(filenames)
 - Support for compressed files [`.zst`,  `.zip`, `.tar`, `.gz`, `.tar.gz`]
 
 ### Changelogs
+July 2, 2021 - v0.1.12
+- Change `.textread` to return string rather than list
+    - `.textreadlines` replaces original function
+- Update `.textlist` to support option for stripping newlines and have replacements
+    - `strip_newlines = True`, will strip all newlines prior to return
+    - `replacements: [ list | dict | str ] = None`, will iterate through and replace
+- Add `.readfile` method to return `.read()` API
+- Add `.mod_fname(filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False)`
+
 June 30, 2021 - v0.1.11
 - Added Dill as default pickler if installed
 - Ability to set any pickle method that supports .dumps/.loads call with `File.set_pickler(name='pickler')` or `File.set_pickler(function=cloudpickle)`

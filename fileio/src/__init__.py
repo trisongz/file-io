@@ -1,3 +1,4 @@
+from operator import ne
 import os
 import pickle
 import csv
@@ -278,6 +279,31 @@ class File(object):
         return ext_file
 
     @classmethod
+    def mod_fname(cls, filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False):
+        basefname = File.base(filename)
+        basesplit = basefname.split('.', 1)
+        basenoext = basesplit[0]
+        fname = basenoext if not new_name else new_name
+        if not ext:
+            if new_name and '.' in new_name:
+                ext = File.ext(new_name)
+                fname = new_name.replace(ext, '')
+            else:
+                ext = File.ext(filename)
+        #if new_name and '.' in new_name:
+        #    fname = new_name.split('.', 1)[0]
+        if prefix: fname = prefix + fname
+        if suffix: fname += suffix
+        fullname = fname + '.' + ext
+        if filename_only:
+            return fullname
+        directory = directory or File.getdir(filename)
+        if create_dirs:
+            File.makedirs(directory)
+        return File.join(directory, fullname)
+
+
+    @classmethod
     def findir(cls, filepath, directory):
         filename = File.base(filepath)
         return File.pexists(directory, filename)
@@ -353,6 +379,7 @@ class File(object):
     def read(cls, filename, mode='r'):
         return gfile(filename, mode)
     
+    
     @classmethod
     def write(cls, filename, mode='w'):
         return gfile(filename, mode)
@@ -369,6 +396,11 @@ class File(object):
     def readlines(cls, filename):
         with gfile(filename, 'r') as f:
             return f.readlines()
+    
+    @classmethod
+    def readfile(cls, filename, mode='r'):
+        with gfile(filename, mode) as f:
+            return f.read()
 
     @classmethod
     def open(cls, filename, mode='r', auto=True, device=None):
@@ -744,13 +776,31 @@ class File(object):
 
     @classmethod
     def textread(cls, filename):
-        f = gfile(filename, 'r')
-        return f.readlines()
+        return File.readfile(filename)
 
     @classmethod
-    def textlist(cls, filename):
+    def textreadlines(cls, filename):
+        return File.readlines(filename)
+
+    @classmethod
+    def textlist(cls, filename, strip_newlines=True, replacements=None):
         items = File.readlines(filename)
-        items = [i.strip() for i in items]
+        if strip_newlines:
+            items = [i.strip() for i in items]
+        if replacements:
+            if isinstance(replacements, list):
+                logger.info('Assuming Replacements are ""')
+                for r in replacements:
+                    items = [i.replace(r, '') for i in items]
+            elif isinstance(replacements, dict):
+                logger.info('Replacing all items with key = val')
+                for k,v in replacements.items():
+                    items = [i.replace(k, v) for i in items]
+            elif isinstance(replacements, str):
+                logger.info(f'Replacing {replacements} = ""')
+                items = [i.replace(replacements, '') for i in items]
+            else:
+                raise ValueError
         return items
 
     @classmethod
