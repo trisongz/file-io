@@ -409,7 +409,7 @@ class File(object):
             return f.read()
 
     @classmethod
-    def open(cls, filename, mode='r', auto=True, device=None):
+    def open(cls, filename, mode='r', auto=True, device=None, **kwargs):
         if 'r' in mode and auto:
             if filename.endswith('.pkl'):
                 return File.pload(filename)
@@ -1308,9 +1308,10 @@ class File(object):
         return res_meta
 
 
-    def __call__(self, filename, mode='r'):
-        return self.open(filename, mode)
-
+    def __call__(self, filename, mode='r', **kwargs):
+        if kwargs.get('auto'):
+            return self.open(filename, mode, **kwargs)
+        return gfile(filename, mode)
 
 
 def iterator_function(function=None, **kwargs):
