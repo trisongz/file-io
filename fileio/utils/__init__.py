@@ -6,7 +6,7 @@ logger = get_logger()
 _enable_pbar = False
 
 from . import ops
-from .ops import Auth, lazy_import, exec_command, lazy_install
+from .ops import Auth, lazy_import, lazy_check, exec_command, lazy_install
 
 from . import multi
 from .multi import MultiThreadPipeline

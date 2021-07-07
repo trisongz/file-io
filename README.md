@@ -72,6 +72,10 @@ File.jgs(filenames)
 - Support for compressed files [`.zst`,  `.zip`, `.tar`, `.gz`, `.tar.gz`]
 
 ### Changelogs
+July 7, 2021 - v0.1.14
+- Remove Explicit need for Tensorflow in setup, but still require it at the moment.
+    - This may help with macos Tensorflow installations using `tensorflow-macos`
+
 July 2, 2021 - v0.1.13
 - Change `.textread` to return string rather than list
     - `.textreadlines` replaces original function

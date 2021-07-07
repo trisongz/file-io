@@ -19,25 +19,28 @@ from pprint import pprint
 from datetime import datetime, timedelta, timezone
 from itertools import islice, accumulate
 
-try:
-    import torch
-    _torch_avail = True
-    torchdevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-except ImportError:
-    _torch_avail = False
-    torchdevice = None
-
-try:
-    import dill
-    _dill_avail = True
-except ImportError:
-    _dill_avail = False
 
 _gsutil = None
 _tmpdirs = []
 
 from ..utils import logger
-from ..utils import lazy_import, lazy_install, Auth, exec_command, _enable_pbar
+from ..utils import lazy_import, lazy_install, lazy_check, Auth, exec_command, _enable_pbar
+
+_tf_avail = lazy_check('tensorflow')
+_torch_avail = lazy_check('torch')
+_dill_avail = lazy_check('dill')
+
+if _dill_avail:
+    import dill
+
+torchdevice = None
+if _torch_avail:
+    import torch
+    torchdevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
+if not _tf_avail:
+    logger.warning('Tensorflow was not found. This may cause errors in using the library.')
+
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 gf = lazy_import('tensorflow.io.gfile')
@@ -72,7 +75,6 @@ _pickler = pickle
 _picklers = ['dill', 'pickle', 'pkl']
 if _dill_avail:
     _pickler = dill
-
 
 
 def _set_pickler(function=None, name='dill'):

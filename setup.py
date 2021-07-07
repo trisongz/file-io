@@ -21,7 +21,7 @@ deps = {
         'requests',
         'pyyaml',
         'pysimdjson',
-        'tensorflow>=1.15.0',
+        #'tensorflow>=1.15.0',
     ],
     'extras':{
         'gcp': ['google-api-python-client', 'google-compute-engine', 'google-cloud-storage', 'oauth2client'],
