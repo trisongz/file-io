@@ -281,7 +281,7 @@ class File(object):
         return ext_file
 
     @classmethod
-    def mod_fname(cls, filename, newname=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False):
+    def mod_fname(cls, filename, newname=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False, space_replace=None):
         basefname = File.base(filename)
         basesplit = basefname.split('.', 1)
         basenoext = basesplit[0]
@@ -296,6 +296,7 @@ class File(object):
             ext = File.ext(filename)
         if prefix: fname = prefix + fname
         if suffix: fname += suffix
+        if space_replace: fname = fname.replace(' ', space_replace).strip()
         fullname = fname + ext
         if filename_only:
             return fullname

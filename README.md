@@ -85,7 +85,7 @@ July 2, 2021 - v0.1.13
     - `replacements: [ list | dict | str ] = None`, will iterate through and replace
 - Update `.base(filename, with_ext=True)` to allow return without File Extension
 - Add `.readfile` method to return `.read()` API
-- Add `.mod_fname(filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False)`
+- Add `.mod_fname(filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False, space_replace='_')`
     - `src = 'gs://mybucket/path/file.txt'`
     - `res = File.mod_fname(src, newname='newfile', ext='json', directory='/newdir', prefix='test_', suffix='_001')`
     - `>> res = /newdir/test_newfile_001.json`
