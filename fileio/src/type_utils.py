@@ -210,6 +210,14 @@ class ReadOnlyPath(PurePath, Protocol):
             **kwargs: Any,
     ) -> typing.IO[AnyStr]:
         """Opens the file."""
+    
+    def read(self, mode='rb') -> bytes:
+        with self.open(mode=mode) as f:
+            return f.read()
+    
+    def readlines(self) -> List[str]:
+        with self.open('r') as f:
+            return f.readlines()
 
     def read_bytes(self) -> bytes:
         """Reads contents of self as bytes."""
