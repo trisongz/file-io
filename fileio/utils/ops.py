@@ -8,6 +8,7 @@ import pkg_resources
 import json
 from subprocess import check_output
 from abc import abstractmethod
+
 from . import logger
 
 root = os.path.abspath(os.path.dirname(__file__))
@@ -27,6 +28,23 @@ def exec_command(cmd):
     if isinstance(out, bytes):
         out = out.decode('utf8')
     return out.strip()
+
+def gsutil_exec(command, pbar = None, verbose = True):
+    """
+    Runs a given command using subprocess module
+    """
+    p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, bufsize=1)
+    for line in iter(p.stdout.readline, ''):
+        if not line:
+            break
+        if isinstance(line, bytes): line = line.decode('utf8')
+        line = line.replace('\r', '').replace('\n', '')
+        if line and verbose:
+            if pbar:
+                pbar.write(line)
+            else:
+                print(line)
+                sys.stdout.flush()
 
 def lazy_check(req):
     try:

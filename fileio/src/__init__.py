@@ -23,11 +23,19 @@ from .core import (
     TFRecordWriter,
     lazy_install,
     lazy_import,
-    iterator_function
+    iterator_function,
+    get_pathlike,
+    filter_files,
+    gsutil_exec,
+    gsutil_rsync,
+    gsutil_sync,
+
 )
 
 from .generic_path import as_path
 from .gpath import PathIOLike
+from .data_ops import autojson, read_json, read_jsonlines
+
 
 PathIO = as_path
 pickler = _pickler
@@ -63,5 +71,12 @@ __all__ = [
     "TFRecordWriter",
     "lazy_install",
     "lazy_import",
-    "iterator_function"
+    "iterator_function",
+    "get_pathlike",
+    "filter_files",
+    "gsutil_rsync",
+    "gsutil_sync",
+    "autojson", 
+    "read_json", 
+    "read_jsonlines"
 ]

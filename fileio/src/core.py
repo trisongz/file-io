@@ -3,6 +3,7 @@ import os
 import pickle
 import csv
 import yaml
+import time
 import warnings
 import requests
 import tempfile
@@ -13,18 +14,21 @@ import random
 import gdown as gdownload
 import simdjson as json
 import gc
-
+from typing import List, Union
 from tqdm.auto import tqdm
 from pprint import pprint
 from datetime import datetime, timedelta, timezone
 from itertools import islice, accumulate
-
+import multiprocessing as mp
+import platform
 
 _gsutil = None
 _tmpdirs = []
 
+from .gpath import PathIOLike
+from .generic_path import as_path
 from ..utils import logger
-from ..utils import lazy_import, lazy_install, lazy_check, Auth, exec_command, _enable_pbar
+from ..utils import lazy_import, lazy_install, lazy_check, Auth, exec_command, _enable_pbar, gsutil_exec
 
 _tf_avail = lazy_check('tensorflow')
 _torch_avail = lazy_check('torch')
@@ -69,6 +73,9 @@ enable_eager_execution = tf.compat.v1.enable_eager_execution
 disable_v2_behavior = tf.compat.v1.disable_v2_behavior
 timestamp = lambda: datetime.now(timezone.utc).isoformat('T')
 ftimestamp = lambda: datetime.now(timezone.utc).strftime("%b%d%Y_TM_%H%M%S")
+
+CPU_CORES = mp.cpu_count()
+CURR_SYS = platform.system()
 
 _printer = pprint
 _pickler = pickle
@@ -130,6 +137,77 @@ def install_gsutil():
 def check_gsutil():
     if not _gsutil:
         install_gsutil()
+
+
+def get_pathlike(filepath: Union[str, PathIOLike]):
+    if isinstance(filepath, str): filepath = as_path(filepath)
+    return filepath
+
+def filter_files(files: List[Union[str, PathIOLike]], include=[], exclude=['.git']):
+    files = [get_pathlike(f) for f in files]
+    if include: files = [f for f in files if bool(set(f.parts).intersection(include))]
+    if exclude: files = [f for f in files if not bool(set(f.parts).intersection(exclude))]
+    return files
+
+
+def gsutil_sync(src_bucket: Union[str, PathIOLike], dest: Union[str, PathIOLike], dryrun: bool = True, max_procs=False, verbose=True, pbar=None, skip_check=False, fix_bucketnames=False, absolute=False):
+    if not skip_check:
+        check_gsutil()
+        src_bucket, dest = get_pathlike(src_bucket), get_pathlike(dest)
+        if not dryrun:
+            dest.ensure_dir()
+    
+    num_procs, num_threads = 2, 2
+    if max_procs:
+        num_procs, num_threads = max(num_procs, (CPU_CORES * 2)), max(num_threads, (CPU_CORES * 2))
+    if 'Darwin' in CURR_SYS or 'Windows' in CURR_SYS: num_procs = 1
+    
+    options = [
+        "GSUtil:gzip_compression_level=9",
+        "GSUtil:sliced_object_download_threshold=50M",
+        "GSUtil:sliced_object_download_max_components=10",
+        f"GSUtil:parallel_process_count={num_procs}",
+        f"GSUtil:parallel_thread_count={num_threads}"
+    ]
+    base_cmd = 'gsutil'
+    for opt in options:
+        base_cmd += ' -o ' + opt
+    base_cmd += ' -m rsync -r -i'
+    if dryrun: base_cmd += ' -n'
+
+    if verbose:
+        logger.info('--------' * 4)
+        logger.info(f'Dryrun: {dryrun}')
+        logger.info(f'Performance Mode Enabled: {max_procs}')
+        logger.info(f'Max Threads: {num_threads} | Max Processes: {num_procs}')
+        logger.info(base_cmd)
+        logger.info('--------' * 4)
+
+    pbar = pbar or tqdm([src_bucket], desc='Copying GCS', unit='buckets', dynamic_ncols=True)
+    start = time.time()
+    bucket_name = None
+    for bucket in pbar:
+        if fix_bucketnames: 
+            bucket_name = bucket.split('://', 1)[-1].replace('.','_').replace('-','_')
+        bucket_path = dest.joinpath(bucket_name) if absolute and bucket_name else dest
+        bucket_path.mkdir(parents=True, exist_ok=True)
+        cmd = base_cmd + f' "{bucket}" "{bucket_path.as_posix()}"'
+        pbar.set_description(f'Copying {bucket}')
+        gsutil_exec(command=cmd, pbar=pbar, verbose=verbose)
+        ck = (time.time() - start) / 60
+        pbar.write(f'Copied {bucket} in {ck:.2f} mins')
+        yield {bucket_path: f'{ck:.2f} mins'}
+
+
+def gsutil_rsync(src_buckets: List[Union[str, PathIOLike]], dest: Union[str, PathIOLike], dryrun: bool = True, max_procs=False, verbose=True, fix_bucketnames=None, absolute=None):
+    src_buckets = [get_pathlike(b) for b in src_buckets]
+    dest = get_pathlike(dest)
+    pbar = tqdm(src_buckets, desc='Copying GCS', unit='buckets', dynamic_ncols=True)
+    fix_bucketnames = fix_bucketnames if fix_bucketnames is not None else bool(not dest.is_gcs)
+    absolute = absolute if absolute is not None else bool(dest.is_gcs)
+    yield from gsutil_sync(src_bucket=None, dest=dest, dryrun=dryrun, max_procs=max_procs, verbose=verbose, skip_check=True, pbar=pbar, fix_bucketnames=fix_bucketnames, absolute=absolute)
+    
+
 
 class File(object):
     @classmethod

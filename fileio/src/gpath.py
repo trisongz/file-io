@@ -97,6 +97,8 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
 
     def resolve(self: _P, strict: bool = False) -> _P:
         """Returns the abolute path."""
+        if self.is_cloud:
+            return self._new(self.as_posix())
         return self._new(self._PATH.abspath(self._path_str))
 
     def glob(self: _P, pattern: str) -> Iterator[_P]:
@@ -170,18 +172,104 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
         tf.io.gfile.rename(self._path_str, os.fspath(target), overwrite=True)
         return target
 
-    def copy(self: _P, dst: type_utils.PathLike, overwrite: bool = False) -> _P:
-        """Remove the directory."""
+    def copy(self: _P, dst: type_utils.PathLike, overwrite: bool = False, skip_errors=False) -> _P:
+        """Copies the File to the Dir/File."""
         # Could add a recursive=True mode
+        dst = self._new(dst) if isinstance(dst, str) else dst
+        if not dst.is_file(): dst = dst.parent.joinpath(self.name)
+        try:
+            tf.io.gfile.copy(self._path_str, os.fspath(dst), overwrite=overwrite)
+            return dst
+        except Exception as e:
+            print(f'Error Copying {self._path_str} -> {dst.as_posix()}: {str(e)}')
+            if skip_errors:
+                return None
+            raise ValueError
+        
+    def copydir(self: _P, dst: type_utils.PathLike, ignore=['.git'], overwrite: bool = False, dryrun: bool = False):
+        """Copies the Current Top Level Parent Dir to the Dst Dir without recursion"""
         dst = self._new(dst)
-        tf.io.gfile.copy(self._path_str, os.fspath(dst), overwrite=overwrite)
-        return dst
-    
+        assert dst.is_dir(), 'Destination is not a valid directory'
+        if not dryrun: dst.ensure_dir()
+        copied_files = []
+        fnames = self.listdir(ignore=ignore)
+        curdir = self.absolute_parent
+        for fname in fnames:
+            dest_path = dst.joinpath(fname.relative_to(curdir))
+            if not dryrun:
+                fname.copy(dest_path, overwrite=overwrite, skip_errors=True)
+            copied_files.append(dest_path)
+        return copied_files
+
+
+    def copydirs(self: _P, dst: type_utils.PathLike, mode: str = 'shallow', pattern='*', ignore=['.git'], overwrite: bool = False, levels: int = 2, dryrun: bool = False):
+        """Copies the Current Parent Dir to the Dst Dir.
+        modes = [shallow for top level recursive. recursive for all nested]
+        levels = number of recursive levels
+        dryrun = returns all files that would have been copied without copying
+        """
+        assert mode in {'shallow', 'recursive'}, 'Invalid Mode Option: [shallow, recursive]'
+        dst = self._new(dst)
+        assert dst.is_dir(), 'Destination is not a valid directory'
+        levels = max(1, levels)
+        dst.ensure_dir()
+        curdir = self.absolute_parent
+        copied_files = []
+        if levels > 1 and mode == 'recursive' and '/' not in pattern:
+            for _ in range(1, levels): pattern += '/*'
+        if self.is_dir() and not pattern.startswith('/'): pattern = '*/' + pattern
+        fiter = curdir.glob(pattern) if mode == 'shallow' else curdir.rglob(pattern)
+        fnames = [f for f in fiter if not bool(set(f.parts).intersection(ignore))]
+        print(len(fnames))
+        for f in fnames:
+            dest_path = dst.joinpath(f.relative_to(curdir))
+            if not dryrun:
+                if f.is_dir():
+                    dest_path.ensure_dir()
+                else:
+                    f.copy(dest_path, overwrite=overwrite, skip_errors=True)
+            copied_files.append(dest_path)
+        return copied_files
+
+    def listdir(self: _P, ignore=['.git'], skip_dirs=True, skip_files=False):
+        fnames = [f for f in self.iterdir() if not bool(set(f.parts).intersection(ignore))]
+        fnames = [f.resolve() for f in fnames]
+        if skip_dirs:
+            return [f for f in fnames if f.is_file()]
+        if skip_files:
+            return [f for f in fnames if f.is_dir()]
+        return fnames
+
+    def listdirs(self: _P, mode: str = 'shallow', pattern='*', ignore=['.git'], skip_dirs=True, skip_files=False, levels: int = 2):
+        """Lists all files in current parent dir
+        modes = [shallow for top level recursive. recursive for all nested]
+        """
+        assert mode in {'shallow', 'recursive'}, 'Invalid Mode Option: [shallow, recursive]'
+        curdir = self.absolute_parent
+        levels = max(1, levels)
+        if levels > 1 and mode == 'recursive' and '/' not in pattern:
+            for _ in range(1, levels): pattern += '/*'
+        if self.is_dir() and not pattern.startswith('*/'): pattern = '*/' + pattern
+        print(pattern)
+        fiter = curdir.glob(pattern) if mode == 'shallow' else curdir.rglob(pattern)
+        fnames = [f for f in fiter if not bool(set(f.parts).intersection(ignore))]
+        print(len(fnames))
+        if skip_dirs:
+            return [f for f in fnames if f.is_file()]
+        if skip_files:
+            return [f for f in fnames if f.is_dir()]
+        return [f for f in fnames]
+
+
+    def ensure_dir(self: _P, mode: int = 0o777, parents: bool = True, exist_ok: bool = True):
+        """Ensures the parent directory exists, creates if not"""
+        return self.absolute_parent.mkdir(mode=mode, parents=parents, exist_ok=exist_ok)
+
     @property
     def absolute_parent(self: _P) -> _P:
         uri_scheme = self._uri_scheme
-        if uri_scheme:    # pylint: disable=using-constant-test
-            return self._PATH.join(f'{uri_scheme}://', self.parts[2])
+        if uri_scheme:
+            return self._new(self._PATH.join(f'{uri_scheme}://', '/'.join(self.parts[2:-1])))
         p = self.resolve()
         if p.is_dir: 
             return p
@@ -198,7 +286,10 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
     @property
     def is_s3(self: _P) -> bool:
         return bool(self._uri_scheme == 's3')
-
+    
+    @property
+    def file_ext(self: _P) -> bool:
+        return self.suffix[1:]
     
 
 

@@ -95,3 +95,4 @@ def as_path(path: PathLike) -> ReadWritePath:
         return path_cls(path)
     else:
         raise TypeError(f'Invalid path type: {path!r}')
+
