@@ -21,7 +21,7 @@ pathlike = PathIO('s3://path/to/item.txt')
 ```
 
 ### Changelogs
-
+---
 Aug 31, 2021 v0.3.0alpha
 
 - Major refactor to remove `tensorflow` as primary dependency
@@ -36,15 +36,15 @@ Aug 31, 2021 v0.3.0alpha
     - All previous `File` APIs are still usable.
     - Does not check for `tensorflow` dependency. So using without `tensorflow` will break
 
-
+---
 Aug 3, 2021 - v0.1.16
 - A lot. But its pretty lazily done.
-
+---
 July 7, 2021 - v0.1.15
 - Modified behavior of `open` and direct `__call__`
 - Remove Explicit need for Tensorflow in setup, but still require it at the moment.
     - This may help with macos Tensorflow installations using `tensorflow-macos`
-
+---
 July 2, 2021 - v0.1.13
 - Change `.textread` to return string rather than list
     - `.textreadlines` replaces original function
@@ -58,35 +58,35 @@ July 2, 2021 - v0.1.13
     - `res = File.mod_fname(src, newname='newfile', ext='json', directory='/newdir', prefix='test_', suffix='_001')`
     - `>> res = /newdir/test_newfile_001.json`
 
-
+---
 June 30, 2021 - v0.1.11
 - Added Dill as default pickler if installed
 - Ability to set any pickle method that supports .dumps/.loads call with `File.set_pickler(name='pickler')` or `File.set_pickler(function=cloudpickle)`
 - Hotfix to change method to dumps/loads
 - Hotfix for .gsutil method which did not initialize properly.
-
+---
 June 11, 2021 - v0.1.8
 - Hotfix for methods .split_file/.split_files
-
+---
 June 9, 2021 - v0.1.7
 - Hotfix for Method .get_local
 - Hotfix for method .jlgs
-
+---
 May 28, 2021 - v0.1.6
 - Added Method to get User Dir
     - File.userdir
-
+---
 May 21, 2021 - v0.1.5
 - Added TSV/CSV Write Methods
     - File.csvwrite
     - File.tsvwrite
-
+---
 May 20, 2021 - v0.1.4
 - Hotfix for file.split_file(s) method to also return resulting filenames with `output_files` key
-
+---
 May 20, 2021 - v0.1.3
 - Py Version Requirement Fix
-
+---
 May 19, 2021 - v0.1.2
 - Minor Fixes
 - Added Methods for Splitting Files/Items
@@ -94,12 +94,12 @@ May 19, 2021 - v0.1.2
     - File.split_items
     - File.split_file
     - File.split_files
-
+---
 May 12, 2021 - v0.1.1
 - Minor Fixes
 - Added Method
     - File.fmv
-
+---
 May 12, 2021 - v0.1.0
 - Refactored Library
 - Organized Methods
@@ -173,9 +173,9 @@ May 12, 2021 - v0.1.0
     - File.bcopy
 - Added TFDSIODataset
 
-
+---
 ## Previous Version
-
+---
 ```python
 from fileio import File
 
