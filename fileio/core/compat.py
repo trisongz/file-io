@@ -1,213 +1,36 @@
-
+# Provides compatibility to the old File API
 import os
-import pickle
 import csv
-import yaml
-import time
-import warnings
 import requests
-import tempfile
-import types
-import math
-import hashlib
 import random
-import gdown as gdownload
-import simdjson as json
+import yaml
+import hashlib
+import tempfile
+import math
+import types
 import gc
-from typing import List, Union
+
+from itertools import accumulate
+from datetime import datetime, timezone
 from tqdm.auto import tqdm
-from pprint import pprint
-from datetime import datetime, timedelta, timezone
-from itertools import islice, accumulate
-import multiprocessing as mp
-import platform
+from fileio import configs
+from fileio.core import logger
+from fileio.core.libs import (
+    PICKLE_FUNC, 
+    PT_DEVICE, 
+    PT_FUNC,
+    TF_FUNC,
+    JSON_FUNC,
+    JSON_PARSER
+)
+json = JSON_FUNC
+jparser = JSON_PARSER
+gfile = TF_FUNC.io.gfile
 
-_gsutil = None
-_tmpdirs = []
-
-from .gpath import PathIOLike
-from .generic_path import as_path
-from ..utils import logger
-from ..utils import lazy_import, lazy_install, lazy_check, Auth, exec_command, _enable_pbar, gsutil_exec
-
-_tf_avail = lazy_check('tensorflow')
-_torch_avail = lazy_check('torch')
-_dill_avail = lazy_check('dill')
-
-if _dill_avail:
-    import dill
-
-torchdevice = None
-if _torch_avail:
-    import torch
-    torchdevice = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-if not _tf_avail:
-    logger.warning('Tensorflow was not found. This may cause errors in using the library.')
-
-
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-gf = lazy_import('tensorflow.io.gfile')
-gfile = gf.GFile
-glob = gf.glob
-gcopy = gf.copy
-isdir = gf.isdir
-isfile = os.path.isfile
-listdir = gf.listdir
-mkdirs = gf.makedirs
-mv = gf.rename
-exists = gf.exists
-rmdir = gf.rmtree
-rm = gf.remove
-jparser = json.Parser()
-cd = os.chdir
-curdir = os.getcwd
-usrdir = os.path.expanduser("~")
-
-tf = lazy_import('tensorflow')
-TextLineDataset = tf.data.TextLineDataset
-TFRecordDataset = tf.data.TFRecordDataset
-TFRecordWriter = tf.io.TFRecordWriter
-AUTOTUNE = tf.data.experimental.AUTOTUNE
-enable_eager_execution = tf.compat.v1.enable_eager_execution
-disable_v2_behavior = tf.compat.v1.disable_v2_behavior
 timestamp = lambda: datetime.now(timezone.utc).isoformat('T')
 ftimestamp = lambda: datetime.now(timezone.utc).strftime("%b%d%Y_TM_%H%M%S")
 
-CPU_CORES = mp.cpu_count()
-CURR_SYS = platform.system()
-
-_printer = pprint
-_pickler = pickle
-_picklers = ['dill', 'pickle', 'pkl']
-if _dill_avail:
-    _pickler = dill
-
-
-def _set_pickler(function=None, name='dill'):
-    global _pickler
-    if function:
-        logger.info(f'Setting Pickle method to Function. Assuming valid loads/dumps support')
-        _pickler = function
-        return
-    if name not in _picklers:
-        try:
-            _picklemethod = lazy_import(name)
-            _pickler = _picklemethod
-            logger.info(f'Set Pickle Method to {name}')
-            return
-        except ImportError:
-            logger.error(f'Unable to import {name}')
-        raise ValueError(f'{name} not a valid option: {_picklers}')
-    if name == 'dill':
-        assert _dill_avail, 'Dill is not currently installed to be used'
-        _pickler = dill
-        logger.info('Set Pickle Method as Dill')
-        return
-    if name in ['pickle', 'pkl']:
-        _pickler = pickle
-        logger.info('Set Pickle Method as Default Pickle')
-        return
-
-
-
-def _set_print(name_or_func=None):
-    global _printer
-    if not name_or_func and _printer:
-        return
-    if not isinstance(name_or_func, str):
-        _printer = name_or_func
-        return
-    if name_or_func == 'pprint' or name_or_func not in ['print', 'logger']:
-        _printer = pprint
-    elif name_or_func == 'print':
-        _printer = print
-    else:
-        _printer = logger.info
-    
-def install_gsutil():
-    global _gsutil
-    if _gsutil:
-        return
-    if exec_command('gsutil') == '':
-        lazy_install('gsutil')
-    exec_command('gcloud config set pass_credentials_to_gsutil false')
-    _gsutil = True
-
-def check_gsutil():
-    if not _gsutil:
-        install_gsutil()
-
-
-def get_pathlike(filepath: Union[str, PathIOLike]):
-    if isinstance(filepath, str): filepath = as_path(filepath)
-    return filepath
-
-def filter_files(files: List[Union[str, PathIOLike]], include=[], exclude=['.git']):
-    files = [get_pathlike(f) for f in files]
-    if include: files = [f for f in files if bool(set(f.parts).intersection(include))]
-    if exclude: files = [f for f in files if not bool(set(f.parts).intersection(exclude))]
-    return files
-
-
-def gsutil_sync(src_bucket: Union[str, PathIOLike], dest: Union[str, PathIOLike], dryrun: bool = True, max_procs=False, verbose=True, pbar=None, skip_check=False, fix_bucketnames=False, absolute=False):
-    if not skip_check:
-        check_gsutil()
-        src_bucket, dest = get_pathlike(src_bucket), get_pathlike(dest)
-        if not dryrun:
-            dest.ensure_dir()
-    
-    num_procs, num_threads = 2, 2
-    if max_procs:
-        num_procs, num_threads = max(num_procs, (CPU_CORES * 2)), max(num_threads, (CPU_CORES * 2))
-    if 'Darwin' in CURR_SYS or 'Windows' in CURR_SYS: num_procs = 1
-    
-    options = [
-        "GSUtil:gzip_compression_level=9",
-        "GSUtil:sliced_object_download_threshold=50M",
-        "GSUtil:sliced_object_download_max_components=10",
-        f"GSUtil:parallel_process_count={num_procs}",
-        f"GSUtil:parallel_thread_count={num_threads}"
-    ]
-    base_cmd = 'gsutil'
-    for opt in options:
-        base_cmd += ' -o ' + opt
-    base_cmd += ' -m rsync -r -i'
-    if dryrun: base_cmd += ' -n'
-
-    if verbose:
-        logger.info('--------' * 4)
-        logger.info(f'Dryrun: {dryrun}')
-        logger.info(f'Performance Mode Enabled: {max_procs}')
-        logger.info(f'Max Threads: {num_threads} | Max Processes: {num_procs}')
-        logger.info(base_cmd)
-        logger.info('--------' * 4)
-
-    pbar = pbar or tqdm([src_bucket], desc='Copying GCS', unit='buckets', dynamic_ncols=True)
-    start = time.time()
-    bucket_name = None
-    for bucket in pbar:
-        if fix_bucketnames: 
-            bucket_name = bucket.split('://', 1)[-1].replace('.','_').replace('-','_')
-        bucket_path = dest.joinpath(bucket_name) if absolute and bucket_name else dest
-        bucket_path.mkdir(parents=True, exist_ok=True)
-        cmd = base_cmd + f' "{bucket}" "{bucket_path.as_posix()}"'
-        pbar.set_description(f'Copying {bucket}')
-        gsutil_exec(command=cmd, pbar=pbar, verbose=verbose)
-        ck = (time.time() - start) / 60
-        pbar.write(f'Copied {bucket} in {ck:.2f} mins')
-        yield {bucket_path: f'{ck:.2f} mins'}
-
-
-def gsutil_rsync(src_buckets: List[Union[str, PathIOLike]], dest: Union[str, PathIOLike], dryrun: bool = True, max_procs=False, verbose=True, fix_bucketnames=None, absolute=None):
-    src_buckets = [get_pathlike(b) for b in src_buckets]
-    dest = get_pathlike(dest)
-    pbar = tqdm(src_buckets, desc='Copying GCS', unit='buckets', dynamic_ncols=True)
-    fix_bucketnames = fix_bucketnames if fix_bucketnames is not None else bool(not dest.is_gcs)
-    absolute = absolute if absolute is not None else bool(dest.is_gcs)
-    yield from gsutil_sync(src_bucket=None, dest=dest, dryrun=dryrun, max_procs=max_procs, verbose=verbose, skip_check=True, pbar=pbar, fix_bucketnames=fix_bucketnames, absolute=absolute)
-    
-
+_tmpdirs = []
 
 class File(object):
     @classmethod
@@ -216,42 +39,41 @@ class File(object):
 
     @classmethod
     def listfiles(cls, filepath):
-        return listdir(filepath)
+        return gfile.listdir(filepath)
 
     @classmethod
     def isfile(cls, filepath):
         if not filepath.startswith('gs://'):
-            return isfile(filepath)
-        return (not isdir(filepath) and exists(filepath))
+            return os.path.isfile(filepath)
+        return (not gfile.isdir(filepath) and gfile.exists(filepath))
 
     @classmethod
     def listdir(cls, filepath):
-        return listdir(filepath)
+        return gfile.listdir(filepath)
     
     @classmethod
     def curdir(cls):
-        return curdir()
+        return os.getcwd()
 
     @classmethod
     def mkdir(cls, directory):
-        return mkdirs(directory)
+        return gfile.makedirs(directory)
 
     @classmethod
     def makedirs(cls, directory):
-        return mkdirs(directory)
+        return gfile.makedirs(directory)
 
     @classmethod
     def mkdirs(cls, directory):
-        return mkdirs(directory)
+        return gfile.makedirs(directory)
     
     @classmethod
     def userdir(cls, path=None, *paths, **kwargs):
         if not path:
-            return usrdir
-        _dir = os.path.join(usrdir, path, *paths)
+            return os.path.expanduser("~")
+        _dir = os.path.join(os.path.expanduser("~"), path, *paths)
         for k in ['mkdir', 'mkdirs', 'makedir', 'makedirs']:
-            if kwargs.get(k):
-                mkdirs(_dir)
+            if kwargs.get(k): gfile.mkadirs(_dir)
         return _dir
     
     @classmethod
@@ -278,15 +100,15 @@ class File(object):
 
     @classmethod
     def isdir(cls, filepath):
-        return isdir(filepath)
+        return gfile.isdir(filepath)
 
     @classmethod
     def glob(cls, filepath):
-        return glob(filepath)
+        return gfile.glob(filepath)
 
     @classmethod
     def mv(cls, src, dest, overwrite=False):
-        return mv(src, dest, overwrite)
+        return gfile.rename(src, dest, overwrite)
     
     @classmethod
     def fmv(cls, src, directory, overwrite=False):
@@ -301,29 +123,29 @@ class File(object):
 
     @classmethod
     def rm(cls, filename):
-        return rm(filename)
+        return gfile.remove(filename)
     
     @classmethod
     def rmdir(cls, filepath):
-        return rmdir(filepath)
+        return gfile.rmtree(filepath)
 
     @classmethod
     def copy(cls, src, dest, overwrite=True):
         try:
-            return gcopy(src, dest, overwrite)
+            return gfile.copy(src, dest, overwrite)
         except Exception as e:
             logger.error(f'Error in Copying {src} -> {dest}: {str(e)}')
             return None
     
     @classmethod
     def bcopy(cls, src, directory, overwrite=True, verbose=False):
-        if not exists(directory):
-            mkdirs(directory)
+        if not gfile.exists(directory):
+            gfile.makedirs(directory)
         dest = os.path.join(directory, os.path.basename(src))
-        if not exists(dest) or overwrite:
+        if not gfile.exists(dest) or overwrite:
             if verbose:
                 logger(f'Copying {src} -> {dest}')
-            gcopy(src, dest, overwrite)
+            gfile.copy(src, dest, overwrite)
         elif verbose:
             logger(f'Skipping {src} -> {dest} Exists')
         return dest
@@ -409,17 +231,17 @@ class File(object):
 
     @classmethod
     def exists(cls, filepath):
-        return exists(filepath)
+        return gfile.exists(filepath)
     
     @classmethod
     def pexists(cls, path, *paths):
-        return exists(File.join(path, *paths))
+        return gfile.exists(File.join(path, *paths))
     
     @classmethod
     def whichpath(cls, path1, path2):
-        if exists(path1):
+        if gfile.exists(path1):
             return path1
-        if exists(path2):
+        if gfile.exists(path2):
             return path2
         raise ValueError
 
@@ -439,8 +261,8 @@ class File(object):
     
     @classmethod
     def cat(cls, filepath, verbose=True):
-        if exists(filepath):
-            f = gfile(filepath, 'r')
+        if gfile.exists(filepath):
+            f = gfile.GFile(filepath, 'r')
             text = f.readlines()
             if verbose:
                 print(text)
@@ -449,8 +271,8 @@ class File(object):
 
     @classmethod
     def touch(cls, filepath, overwrite=False):
-        if not exists or overwrite:
-            with gfile(filepath, 'w') as f:
+        if not gfile.exists or overwrite:
+            with gfile.GFile(filepath, 'w') as f:
                 f.write('\n')
                 f.flush()
             f.close()
@@ -458,33 +280,33 @@ class File(object):
     # File R/W/A Methods
     @classmethod
     def append(cls, filename, mode='a'):
-        return gfile(filename, mode)
+        return gfile.GFile(filename, mode)
     
     @classmethod
     def read(cls, filename, mode='r'):
-        return gfile(filename, mode)
+        return gfile.GFile(filename, mode)
     
     
     @classmethod
     def write(cls, filename, mode='w'):
-        return gfile(filename, mode)
+        return gfile.GFile(filename, mode)
 
     @classmethod
     def rb(cls, filename):
-        return gfile(filename, 'rb')
+        return gfile.GFile(filename, 'rb')
     
     @classmethod
     def wb(cls, filename):
-        return gfile(filename, 'wb')
+        return gfile.GFile(filename, 'wb')
 
     @classmethod
     def readlines(cls, filename):
-        with gfile(filename, 'r') as f:
+        with gfile.GFile(filename, 'r') as f:
             return f.readlines()
     
     @classmethod
     def readfile(cls, filename, mode='r'):
-        with gfile(filename, mode) as f:
+        with gfile.GFile(filename, mode) as f:
             return f.read()
 
     @classmethod
@@ -502,7 +324,7 @@ class File(object):
             if filename.endswith('.pt'):
                 return File.ptload(filename, device)
 
-        return gfile(filename, mode)
+        return gfile.GFile(filename, mode)
     
     @classmethod
     def save(cls, data, filename, overwrite=False):
@@ -571,7 +393,7 @@ class File(object):
             return File.tfwriter(filename)
         if auto:
             mode = File.writemode(filename, overwrite)
-        return gfile(filename, mode)
+        return gfile.GFile(filename, mode)
 
 
     @classmethod
@@ -585,20 +407,20 @@ class File(object):
     
     @classmethod
     def writemode(cls, filepath, overwrite=False):
-        if exists(filepath):
+        if gfile.exists(filepath):
             return 'a'
         return 'w'
 
     @classmethod
     def autowrite(cls, filename, overwrite=False):
-        if overwrite or not exists(filename):
+        if overwrite or not gfile.exists(filename):
             return 'w'
         return 'a'
 
     # Json Methods
     @classmethod
     def jsonload(cls, filename):
-        return json.load(gfile(filename, 'r'))
+        return json.load(gfile.GFile(filename, 'r'))
     
     @classmethod
     def jsonloads(cls, string):
@@ -606,7 +428,7 @@ class File(object):
     
     @classmethod
     def jsondump(cls, obj, filename, indent=2, ensure_ascii=False):
-        return json.dump(obj, gfile(filename, 'w'), indent=indent, ensure_ascii=ensure_ascii)
+        return json.dump(obj, gfile.GFile(filename, 'w'), indent=indent, ensure_ascii=ensure_ascii)
     
     @classmethod
     def jsondumps(cls, pdict, ensure_ascii=False):
@@ -620,7 +442,7 @@ class File(object):
     @classmethod
     def jwrite(cls, data, filename, mode='auto'):
         mode = mode if mode != 'auto' else File.autowrite(filename)
-        with gfile(filename, mode=mode) as f:
+        with gfile.GFile(filename, mode=mode) as f:
             File.jldump(data, f)
         File.fclose(f)
     
@@ -660,7 +482,7 @@ class File(object):
     @classmethod
     def jlwrite(cls, data_items, filename, mode='auto'):
         mode = mode if mode != 'auto' else File.autowrite(filename)
-        with gfile(filename, mode=mode) as f:
+        with gfile.GFile(filename, mode=mode) as f:
             for data in data_items:
                 File.jldumps(data, f)
         File.fclose(f)
@@ -677,7 +499,7 @@ class File(object):
 
     @classmethod
     def jlg(cls, filename, handle_errors=True):
-        with gfile(filename, 'r') as f:
+        with gfile.GFile(filename, 'r') as f:
             for l in f:
                 try:
                     yield File.jlp(l)
@@ -715,7 +537,7 @@ class File(object):
         if isinstance(data, dict):
             return File.jlwrite(data, filename, mode=mode)
         _good, _bad, failed = 0, 0, []
-        with gfile(filename, mode) as f:
+        with gfile.GFile(filename, mode) as f:
             for x, d in enumerate(data):
                 try:
                     File.jldumps(d, f)
@@ -738,7 +560,7 @@ class File(object):
         filenames = File.fsorter(filenames)
         samples = []
         for fname in filenames:
-            reader = LineSeekableFile(gfile(fname, 'r'))
+            reader = LineSeekableFile(gfile.GFile(fname, 'r'))
             File.print(f'Sampling {num_samples} items from {fname}')
             if shuffle:
                 fidxs = [random.randint(0, len(reader)) for i in range(num_samples)]
@@ -753,18 +575,16 @@ class File(object):
     # Pickle Methods
     @classmethod
     def pklsave(cls, obj, filename, **kwargs):
-        data = _pickler.dumps(obj, **kwargs)
-        with gfile(filename, 'wb') as f:
+        data = PICKLE_FUNC.dumps(obj, **kwargs)
+        with gfile.GFile(filename, 'wb') as f:
             f.write(data)
             f.flush()
-        #return _pickler.dump(obj, gfile(filename, 'wb'))
 
     @classmethod
     def pklload(cls, filename, **kwargs):
-        with gfile(filename, 'rb') as f:
-            data = _pickler.loads(f.read(), **kwargs)
+        with gfile.GFile(filename, 'rb') as f:
+            data = PICKLE_FUNC.loads(f.read(), **kwargs)
         return data
-        #return _pickler.load(gfile(filename, 'rb'))
     
     @classmethod
     def pload(cls, filename, **kwargs):
@@ -777,13 +597,12 @@ class File(object):
     # Torch Methods
     @classmethod
     def torchsave(cls, obj, filename):
-        assert _torch_avail, 'pytorch is not available'
-        return torch.save(obj, gfile(filename, 'wb'))
+        assert PT_FUNC, 'pytorch is not available'
+        return PT_FUNC.save(obj, gfile.GFile(filename, 'wb'))
 
     @classmethod
     def torchload(cls, filename, device=None):
-        assert _torch_avail, 'pytorch is not available'
-        return torch.load(gfile(filename, 'rb'), map_location=device)
+        return PT_FUNC.load(gfile.GFile(filename, 'rb'), map_location=device or PT_DEVICE)
     
     @classmethod
     def ptsave(cls, obj, filename):
@@ -796,19 +615,19 @@ class File(object):
     # CSV / TSV Methods
     @classmethod
     def csvload(cls, filename):
-        return list(csv.reader(gfile(filename, 'r')))
+        return list(csv.reader(gfile.GFile(filename, 'r')))
 
     @classmethod
     def tsvload(cls, filename):
-        return list(csv.reader(gfile(filename, 'r'), delimiter='\t'))
+        return list(csv.reader(gfile.GFile(filename, 'r'), delimiter='\t'))
     
     @classmethod
     def csvdictload(cls, filename):
-        return dict(csv.DictReader(gfile(filename, 'r')))
+        return dict(csv.DictReader(gfile.GFile(filename, 'r')))
 
     @classmethod
     def tsvdictload(cls, filename):
-        return dict(csv.DictReader(gfile(filename, 'r'), delimiter='\t'))
+        return dict(csv.DictReader(gfile.GFile(filename, 'r'), delimiter='\t'))
 
     @classmethod
     def csvreader(cls, f):
@@ -831,7 +650,7 @@ class File(object):
                 _is_dict = True
                 keys = keys or list(data[0].keys())
 
-        with gfile(filename, mode) as f:
+        with gfile.GFile(filename, mode) as f:
             writer = csv.DictWriter(f, keys, delimiter=delimiter) if _is_dict else csv.writer(f, delimiter=delimiter)
             if keys and mode != 'a':
                 writer.writeheader()
@@ -844,14 +663,14 @@ class File(object):
     # Text Lines Methods
     @classmethod
     def textload(cls, filename):
-        with gfile(filename, 'r') as f:
+        with gfile.GFile(filename, 'r') as f:
             for line in f:
                 yield line.strip()
 
     @classmethod
     def textwrite(cls, data, filename, overwrite=False):
-        mode = 'w' if overwrite or not exists(filename) else 'a'
-        with gfile(filename, mode) as f:
+        mode = 'w' if overwrite or not gfile.exists(filename) else 'a'
+        with gfile.GFile(filename, mode) as f:
             if isinstance(data, list):
                 for d in data:
                     f.write(d + '\n')
@@ -897,15 +716,15 @@ class File(object):
     @classmethod
     def tfeager(cls, enable=True):
         if enable:
-            enable_eager_execution()
+            TF_FUNC.compat.v1.enable_eager_execution()
         else:
-            disable_v2_behavior()
+            TF_FUNC.compat.v1.disable_v2_behavior()
     
     @classmethod
     def tflines(cls, filenames):
         File.tfeager()
         fnames = File.fsorter(filenames)
-        return TextLineDataset(fnames, num_parallel_reads=AUTOTUNE)
+        return TF_FUNC.data.TextLineDataset(fnames, num_parallel_reads=TF_FUNC.data.experimental.AUTOTUNE)
     
     @classmethod
     def tfjl(cls, filenames, handle_errors=True, verbose=False):
@@ -942,17 +761,17 @@ class File(object):
                         logger.info(f'Error on {idx}: {str(e)} - {x}')
     
     @classmethod
-    def tfreader(cls, filenames, compression=None, buffer=None, num_parallel=AUTOTUNE):
-        return TFRecordDataset(filenames, compression_type=compression, buffer_size=buffer, num_parallel_reads=num_parallel)
+    def tfreader(cls, filenames, compression=None, buffer=None, num_parallel=TF_FUNC.data.experimental.AUTOTUNE):
+        return TF_FUNC.data.TFRecordDataset(filenames, compression_type=compression, buffer_size=buffer, num_parallel_reads=num_parallel)
     
     @classmethod
     def tfwriter(cls, filename):
-        return TFRecordWriter(filename)
+        return TF_FUNC.io.TFRecordWriter(filename)
     
     # YAML Methods
     @classmethod
     def ydump(cls, data, filepath):
-        return yaml.dump(data, stream=gfile(filepath, 'w'), indent=2)
+        return yaml.dump(data, stream=gfile.GFile(filepath, 'w'), indent=2)
     
     @classmethod
     def ydumps(cls, data):
@@ -964,12 +783,12 @@ class File(object):
 
     @classmethod
     def yload(cls, filename):
-        return File.yloads(gfile(filename, 'r'))
+        return File.yloads(gfile.GFile(filename, 'r'))
     
     @classmethod
     def yparse(cls, data_or_file):
         if File.isfile(data_or_file):
-            return yaml.parse(gfile(data_or_file, 'r'))
+            return yaml.parse(gfile.GFile(data_or_file, 'r'))
         return yaml.parse(data_or_file)
     
     # Download Methods
@@ -984,7 +803,7 @@ class File(object):
             return
         rstream = requests.get(url, stream=True)
         with File.wb(filename) as f:
-            for chunk in tqdm(rstream.iter_content(chunk_size=chunk_size), desc=f'Downloading {filename}', disable=(quiet or not _enable_pbar)):
+            for chunk in tqdm(rstream.iter_content(chunk_size=chunk_size), desc=f'Downloading {filename}', disable=(quiet or not configs.ENABLE_PROGRESS_BAR)):
                 if not chunk:
                     break
                 f.write(chunk)
@@ -998,7 +817,7 @@ class File(object):
             return
         rstream = requests.get(url, stream=True)
         with File.wb(filepath) as f:
-            for chunk in tqdm(rstream.iter_content(chunk_size=chunk_size), desc=f'Downloading {filepath}', disable=(quiet or not _enable_pbar)):
+            for chunk in tqdm(rstream.iter_content(chunk_size=chunk_size), desc=f'Downloading {filepath}', disable=(quiet or not configs.ENABLE_PROGRESS_BAR)):
                 if not chunk:
                     break
                 f.write(chunk)
@@ -1008,7 +827,7 @@ class File(object):
     @classmethod
     def batch_download(cls, urls, directory=None, overwrite=False):
         if not directory:
-            directory = curdir()
+            directory = os.getcwd()
             logger.info(f'No Directory Set. Using: {directory}')
         logger.info(f'Downloading {len(urls)} Urls')
         for url in urls:
@@ -1026,18 +845,19 @@ class File(object):
 
     @classmethod
     def gdown(cls, url, extract=True, verbose=False):
+        import gdown as _gdown
         url = File.gurl(url)
         if extract:
-            return gdownload.cached_download(url, postprocess=gdownload.extractall, quiet=verbose)
-        return gdownload.download(url, quiet=verbose)
+            return _gdown.cached_download(url, postprocess=_gdown.extractall, quiet=verbose)
+        return _gdown.download(url, quiet=verbose)
 
     @classmethod
     def batch_gdown(cls, urls, directory=None, extract=True, verbose=False):
         if directory:
-            cd(directory)
+            os.chdir(directory)
             logger.info(f'Downloading into: {directory}')
         else:
-            logger.info(f'No directory set. Using: {curdir()}')
+            logger.info(f'No directory set. Using: {os.getcwd()}')
         logger.info(f'Downloading {len(urls)} Urls')
         for url in urls:
             try:
@@ -1103,22 +923,22 @@ class File(object):
             if not isinstance(fn, str):
                 fn = str(fn)
             if fn.endswith('*'):
-                _newfns = glob(fn)
-                _newfns = [f for f in _newfns if not isdir(f) and exists(f)]
+                _newfns = gfile.glob(fn)
+                _newfns = [f for f in _newfns if not gfile.isdir(f) and gfile.exists(f)]
                 fnames.extend(_newfns)
-            elif not isdir(fn) and exists(fn):
+            elif not gfile.isdir(fn) and gfile.exists(fn):
                 fnames.append(fn)
         return fnames
 
     @classmethod
     def gfile(cls, filename, mode):
-        return gfile(filename, mode)
+        return gfile.GFile(filename, mode)
     
     @classmethod
     def gfiles(cls, filenames, mode='r'):
         fnames = File.fsorter(filenames)
         for fn in fnames:
-            yield gfile(fn, mode)
+            yield gfile.GFile(fn, mode)
 
     @classmethod
     def num_lines(cls, filenames):
@@ -1143,28 +963,6 @@ class File(object):
             return (True, 's3')
         else:
             return (False, None)
-    
-    @classmethod
-    def print(cls, msg, *args, **kwargs):
-        return _printer(msg, *args, **kwargs)
-
-    @classmethod
-    def set_printer(cls, name_or_func):
-        _set_print(name_or_func)
-    
-    @classmethod
-    def set_pickler(cls, function=None, name='pickle', auto=True):
-        if function:
-            _set_pickler(function=function)
-            return
-        if name == 'dill' and auto and not _dill_avail:
-            lazy_install('dill')
-        elif name not in _picklers and auto:
-            try:
-                lazy_install(name)
-            except Exception as e:
-                raise ValueError(f'Error in trying to autoinstall {name}: {str(e)}')
-        _set_pickler(name=name)
     
 
     @classmethod
@@ -1191,16 +989,6 @@ class File(object):
             pos = -1 if mode == 'last' else 0
             tmpdir = _tmpdirs.pop(pos)
             tmpdir.cleanup()
-            #rmdir(tmpdir)
-
-    @classmethod
-    def gsutil(cls, cmd, multi=True):
-        check_gsutil()
-        if not cmd.startswith('gsutil'):
-            cmd = 'gsutil ' + cmd
-        if multi and not cmd.startswith('gsutil -m'):
-            cmd = cmd.replace('gsutil', 'gsutil -m')
-        return exec_command(cmd)
 
     @classmethod
     def hash(cls, text):
@@ -1213,9 +1001,8 @@ class File(object):
     
     @classmethod
     def enable_progress(cls):
-        global _enable_pbar
-        logger.info(f'Enabling TQDM. Currently Enabled: {_enable_pbar}')
-        _enable_pbar = True
+        logger.info(f'Enabling TQDM. Currently Enabled: {configs.ENABLE_PROGRESS_BAR}')
+        configs.ENABLE_PROGRESS_BAR = True
     
     @classmethod
     def enable_pbar(cls):
@@ -1223,9 +1010,8 @@ class File(object):
     
     @classmethod
     def disable_progress(cls):
-        global _enable_pbar
-        logger.info(f'Disabling TQDM. Currently Enabled: {_enable_pbar}')
-        _enable_pbar = False
+        logger.info(f'Disabling TQDM. Currently Enabled: {configs.ENABLE_PROGRESS_BAR}')
+        configs.ENABLE_PROGRESS_BAR = False
     
     @classmethod
     def disable_pbar(cls):
@@ -1241,7 +1027,7 @@ class File(object):
     @classmethod
     def get_local(cls, filenames, directory=None, overwrite=False):
         if not directory:
-            directory = File.join(curdir(), 'data')
+            directory = File.join(os.getcwd(), 'data')
         filenames = File.fsorter(filenames)
         lpaths = []
         for fpath in filenames:
@@ -1390,7 +1176,7 @@ class File(object):
     def __call__(self, filename, mode='r', **kwargs):
         if kwargs.get('auto'):
             return self.open(filename, mode, **kwargs)
-        return gfile(filename, mode)
+        return gfile.GFile(filename, mode)
 
 
 def iterator_function(function=None, **kwargs):

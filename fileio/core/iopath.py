@@ -1,20 +1,16 @@
 
-"""
-Adapted from https://github.com/tensorflow/datasets/blob/v4.4.0/tensorflow_datasets/core/utils/gpath.py
-"""
-
-import ntpath
 import os
+import ntpath
 import pathlib
 import posixpath
 import types
 import typing
 from typing import Any, ClassVar, Iterator, Optional, Type, TypeVar, Union
-
-from ..utils import lazy_import
-from fileio.src import type_utils
-
-tf = lazy_import('tensorflow')
+from fileio.core import type_utils
+from fileio.cloud import auth
+from fileio.core.libs import TF_FUNC
+from fileio.cloud.gcp_gcs import _auth_gcp_gcs, GCSBlob, GCSNotFound
+from fileio.cloud.aws_s3 import _auth_aws_s3
 
 _P = TypeVar('_P')
 
@@ -23,12 +19,12 @@ URI_PREFIXES = ('gs://', 's3://')
 _URI_SCHEMES = frozenset(('gs', 's3'))
 
 _URI_MAP_ROOT = {
-        'gs://': '/gs/',
-        's3://': '/s3/',
+    'gs://': '/gs/',
+    's3://': '/s3/',
 }
 
 
-class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
+class _IOPath(pathlib.PurePath, type_utils.ReadWritePath):
     """Pathlib like api around `tf.io.gfile`."""
 
     # `_PATH` is `posixpath` or `ntpath`.
@@ -50,6 +46,7 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
         """Create a new `Path` child of same type."""
         return type(self)(*parts)
 
+
     # Could try to use `cached_property` when beam is compatible (currently
     # raise mutable input error).
     @property
@@ -59,6 +56,19 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
             return self.parts[1]
         else:
             return None
+    
+    @property
+    def bucket_id(self) -> Optional[str]:
+        if self._uri_scheme:
+            return self._PATH.join(f'{self._uri_scheme}://', self.parts[3])
+        return None
+
+    @property
+    def blob_id(self) -> Optional[str]:
+        if self._uri_scheme:
+            return self._PATH.join(*self.parts[3:])
+        return None
+    
 
     @property
     def _path_str(self) -> str:
@@ -80,15 +90,15 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
 
     def exists(self) -> bool:
         """Returns True if self exists."""
-        return tf.io.gfile.exists(self._path_str)
+        return TF_FUNC.io.gfile.exists(self._path_str)
 
     def is_dir(self) -> bool:
         """Returns True if self is a directory."""
-        return tf.io.gfile.isdir(self._path_str)
+        return TF_FUNC.io.gfile.isdir(self._path_str)
 
     def iterdir(self: _P) -> Iterator[_P]:
         """Iterates over the directory."""
-        for f in tf.io.gfile.listdir(self._path_str):
+        for f in TF_FUNC.io.gfile.listdir(self._path_str):
             yield self._new(self, f)
 
     def expanduser(self: _P) -> _P:
@@ -103,23 +113,17 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
 
     def glob(self: _P, pattern: str) -> Iterator[_P]:
         """Yielding all matching files (of any kind)."""
-        for f in tf.io.gfile.glob(self._PATH.join(self._path_str, pattern)):
+        for f in TF_FUNC.io.gfile.glob(self._PATH.join(self._path_str, pattern)):
             yield self._new(f)
 
-    def mkdir(
-            self,
-            mode: int = 0o777,
-            parents: bool = False,
-            exist_ok: bool = False,
-    ) -> None:
+    def mkdir(self, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
         """Create a new directory at this given path."""
         if self.exists() and not exist_ok:
             raise FileExistsError(f'{self._path_str} already exists.')
-
         if parents:
-            tf.io.gfile.makedirs(self._path_str)
+            TF_FUNC.io.gfile.makedirs(self._path_str)
         else:
-            tf.io.gfile.mkdir(self._path_str)
+            TF_FUNC.io.gfile.mkdir(self._path_str)
 
     def rmdir(self) -> None:
         """Remove the empty directory."""
@@ -127,33 +131,27 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
             raise NotADirectoryError(f'{self._path_str} is not a directory.')
         if list(self.iterdir()):
             raise ValueError(f'Directory {self._path_str} is not empty')
-        tf.io.gfile.rmtree(self._path_str)
+        TF_FUNC.io.gfile.rmtree(self._path_str)
 
     def rmtree(self) -> None:
         """Remove the directory."""
-        tf.io.gfile.rmtree(self._path_str)
+        TF_FUNC.io.gfile.rmtree(self._path_str)
 
     def unlink(self, missing_ok: bool = False) -> None:
         """Remove this file or symbolic link."""
         try:
-            tf.io.gfile.remove(self._path_str)
-        except tf.errors.NotFoundError as e:
+            TF_FUNC.io.gfile.remove(self._path_str)
+        except TF_FUNC.errors.NotFoundError as e:
             if not missing_ok:
                 raise FileNotFoundError(str(e))
 
-    def open(
-            self,
-            mode: str = 'r',
-            encoding: Optional[str] = None,
-            errors: Optional[str] = None,
-            **kwargs: Any,
-    ) -> typing.IO[Union[str, bytes]]:
+    def open(self, mode: str = 'r', encoding: Optional[str] = None, errors: Optional[str] = None, **kwargs: Any) -> typing.IO[Union[str, bytes]]:
         """Opens the file."""
         if errors:
             raise NotImplementedError
         if encoding and not encoding.lower().startswith(('utf8', 'utf-8')):
             raise ValueError(f'Only UTF-8 encoding supported. Not: {encoding}')
-        gfile = tf.io.gfile.GFile(self._path_str, mode, **kwargs)
+        gfile = TF_FUNC.io.gfile.GFile(self._path_str, mode, **kwargs)
         gfile = typing.cast(typing.IO[Union[str, bytes]], gfile)
         return gfile
 
@@ -163,13 +161,13 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
         # `GPath.__new__` should dynamically return either `PosixGPath` or
         # `WindowsPath`, similarly to `pathlib.Path`.
         target = self._new(target)
-        tf.io.gfile.rename(self._path_str, os.fspath(target))
+        TF_FUNC.io.gfile.rename(self._path_str, os.fspath(target))
         return target
 
     def replace(self: _P, target: type_utils.PathLike) -> _P:
         """Replace file or directory to the given target."""
         target = self._new(target)
-        tf.io.gfile.rename(self._path_str, os.fspath(target), overwrite=True)
+        TF_FUNC.io.gfile.rename(self._path_str, os.fspath(target), overwrite=True)
         return target
 
     def copy(self: _P, dst: type_utils.PathLike, overwrite: bool = False, skip_errors=False) -> _P:
@@ -178,7 +176,7 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
         dst = self._new(dst) if isinstance(dst, str) else dst
         if not dst.is_file(): dst = dst.parent.joinpath(self.name)
         try:
-            tf.io.gfile.copy(self._path_str, os.fspath(dst), overwrite=overwrite)
+            TF_FUNC.io.gfile.copy(self._path_str, os.fspath(dst), overwrite=overwrite)
             return dst
         except Exception as e:
             print(f'Error Copying {self._path_str} -> {dst.as_posix()}: {str(e)}')
@@ -220,7 +218,7 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
         if self.is_dir() and not pattern.startswith('/'): pattern = '*/' + pattern
         fiter = curdir.glob(pattern) if mode == 'shallow' else curdir.rglob(pattern)
         fnames = [f for f in fiter if not bool(set(f.parts).intersection(ignore))]
-        print(len(fnames))
+        #print(len(fnames))
         for f in fnames:
             dest_path = dst.joinpath(f.relative_to(curdir))
             if not dryrun:
@@ -250,10 +248,10 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
         if levels > 1 and mode == 'recursive' and '/' not in pattern:
             for _ in range(1, levels): pattern += '/*'
         if self.is_dir() and not pattern.startswith('*/'): pattern = '*/' + pattern
-        print(pattern)
+        #print(pattern)
         fiter = curdir.glob(pattern) if mode == 'shallow' else curdir.rglob(pattern)
         fnames = [f for f in fiter if not bool(set(f.parts).intersection(ignore))]
-        print(len(fnames))
+        #print(len(fnames))
         if skip_dirs:
             return [f for f in fnames if f.is_file()]
         if skip_files:
@@ -288,19 +286,118 @@ class _GPath(pathlib.PurePath, type_utils.ReadWritePath):
         return bool(self._uri_scheme == 's3')
     
     @property
+    def is_sb(self: _P) -> bool:
+        return bool(self._uri_scheme == 'supa')
+    
+    @property
     def file_ext(self: _P) -> bool:
         return self.suffix[1:]
     
 
+class PosixGCSPath(_IOPath, pathlib.PurePosixPath):
+    """Pathlib like api around `google.cloud.storage."""
+    _PATH = posixpath
 
-class PosixGPath(_GPath, pathlib.PurePosixPath):
+    def get_blob(self: _P) -> GCSBlob:
+        if not auth.GOOGLE_GCS_AUTH: _auth_gcp_gcs()
+        if not getattr(self, '_bucket'):
+            self._bucket = auth.GOOGLE_GCS_CLIENT.bucket(self.bucket_id)
+        if not getattr(self, '_blob'):
+            self._blob = self._bucket.get_blob(self.blob_id)
+        return self._blob
+
+    def exists(self) -> bool:
+        """Returns True if self exists."""
+        blob = self.get_blob()
+        return blob.exists()
+
+    def unlink(self, missing_ok: bool = False) -> None:
+        """Remove this file or symbolic link."""
+        try:
+            blob = self.get_blob()
+            blob.delete()
+        except GCSNotFound as e:
+            if not missing_ok:
+                raise FileNotFoundError(str(e))
+
+    def open(self, mode: str = 'r', encoding: Optional[str] = None, errors: Optional[str] = None, chunk_size: Optional[int] = None, newline: Optional[str] = None, **kwargs: Any) -> typing.IO[Union[str, bytes]]:
+        """Opens the file."""
+        blob = self.get_blob()
+        filelike = blob.open(mode, chunk_size, encoding, errors, newline)
+        filelike = typing.cast(typing.IO[Union[str, bytes]], filelike)
+        return filelike
+    
+    def rename(self, target: type_utils.PathLike) -> _P:
+        blob = self.get_blob()
+        target = self._new(target)
+        target_blob = target.get_blob()
+        target_blob.rewrite(blob)
+        return target
+
+    def replace(self, target: type_utils.PathLike) -> _P:
+        """Replace file or directory to the given target."""
+        blob = self.get_blob()
+        target = self._new(target)
+        target_blob = target.get_blob()
+        target_blob.rewrite(blob)
+        return target
+
+    def copy(self, dst: type_utils.PathLike, overwrite: bool = False, skip_errors=False) -> _P:
+        """Copies the File to the Dir/File."""
+        # Could add a recursive=True mode
+        dst = self._new(dst) if isinstance(dst, str) else dst
+        if not dst.is_file(): dst = dst.parent.joinpath(self.name)
+        if dst.exists() and not overwrite:
+            raise FileExistsError
+        try:
+            dest_blob = dst.get_blob()
+            blob = self.get_blob()
+            with blob.open('rb') as reader, dest_blob.open('wb') as writer:
+                for chunk in reader:
+                    writer.write(chunk)
+            return dst
+        except Exception as e:
+            print(f'Error Copying {self._path_str} -> {dst.as_posix()}: {str(e)}')
+            if skip_errors:
+                return None
+            raise ValueError
+
+    def read_bytes(self, start=None, end=None) -> bytes:
+        """Reads contents of self as bytes."""
+        blob = self.get_blob()
+        return blob.download_as_bytes(start=start, end=end)
+
+    def read_text(self, encoding: Optional[str] = None, start=None, end=None) -> str:
+        """Reads contents of self as text."""
+        blob = self.get_blob()
+        return blob.download_as_text(encoding=encoding, start=start, end=end)
+
+    def is_dir(self) -> bool:
+        """Returns True if self is a directory."""
+        return self.exists() and self._path_str.endswith('/')
+
+    def iterdir(self: _P) -> Iterator[_P]:
+        """Iterates over the directory."""
+        raise NotADirectoryError
+
+
+class PosixS3Path(_IOPath, pathlib.PurePosixPath):
+    """Pathlib like api around `tf.io.gfile` with AWS Auth."""
+    _PATH = posixpath
+
+    def _new(self: _P, *parts: type_utils.PathLike) -> _P:
+        """Create a new `Path` child of same type."""
+        if not auth.AWS_S3_SESSION: _auth_aws_s3()
+        return type(self)(*parts)
+
+class PosixIOPath(_IOPath, pathlib.PurePosixPath):
     """Pathlib like api around `tf.io.gfile`."""
     _PATH = posixpath
 
 
-class WindowsGPath(_GPath, pathlib.PureWindowsPath):
+class WindowsGPath(_IOPath, pathlib.PureWindowsPath):
     """Pathlib like api around `tf.io.gfile`."""
     _PATH = ntpath
 
 
-PathIOLike = TypeVar("PathIOLike", str, Union[pathlib.Path, PosixGPath])
+PathIOLike = TypeVar("PathIOLike", str, Union[pathlib.Path, PosixIOPath, PosixGCSPath, PosixS3Path])

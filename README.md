@@ -1,77 +1,42 @@
 # file_io
  Deterministic File Lib to make working with Files across Object Storage easier
 
+**Deprecation Notice**
+
+`fileio.File` will soon be deprecated in favor of `fileio.PathIO`.
 
 ## Quickstart
 
-```python3
+```python
 !pip install --upgrade git+https://github.com/trisongz/file_io.git
 !pip install --upgrade file-io
 
 
-from fileio import File, Auth
+from fileio import PathIO
 
-# Auth object is for setting ADC if needed
-
-Auth(adc='/path/to/adc.json')
-
-'''
-Recognized File Extensions
-
-.json               - json
-.jsonl/.jsonlines   - jsonlines
-.csv                - csv
-.tsv                - tsv with "\t" seperator
-.txt                - txtlines
-.pkl                - pickle
-.pt                 - pytorch
-.tfrecords          - tensorflow
-'''
-
-# Main auto classes
-File.open(filename, mode='r', auto=True, device=None) # device is specific to pytorch. Set auto=False to get a barebones Posix via Gfile
-File.save(data, filename, overwrite=False) # if not overwrite, will attempt to append for newline files
-File.load(filenames, device=None) # yields generators per file, meaning you can have different file types
-File.download(url, dirpath=None, filename=None, overwrite=False) # Downloads a single url
-File.gdown(url, extract=True, verbose=False) # uses gdown lib to grab a google drive drive
-
-# Main i/o classes (Not Binary)
-File.read(filename) # 'r'
-File.write(filename) # 'w'
-File.append(filename) # 'a'
-
-# Binary
-File.wb(filename) # 'wb'
-File.rb(filename) # 'rb'
-
-
-# Batch downloaders
-File.batch_download(urls, directory=None, overwrite=False) # downloads all urls into a directory, skipping if overwrite = True and exists
-File.batch_gdown(urls, directory=None, extract=True, verbose=False) # downloads all gdrive urls to a directory
-
-# Extension Specific 
-
-# .json
-File.jsonload(filename)
-File.jsondump(dict, filename)
-
-# .jsonl/.jsonlines (Single File)
-File.jlg(filename)
-File.jlw(data, filename, mode='auto', verbose=True)
-
-# Multifile Readers
-
-# .jsonl/.jsonlines
-File.jgs(filenames)
+pathlike = PathIO('gs://path/to/item.txt')
+pathlike = PathIO('s3://path/to/item.txt')
 
 
 ```
-### Upcoming Changes / APIs
-- Support for setting JSON serializer [`simdjson` by default]
-- Support for Google Sheets manipulation [`gspread`]
-- Support for compressed files [`.zst`,  `.zip`, `.tar`, `.gz`, `.tar.gz`]
 
 ### Changelogs
+
+Aug 31, 2021 v0.3.0alpha
+
+- Major refactor to remove `tensorflow` as primary dependency
+- Started secondary support of `gs` using `google-cloud-storage`
+- Started primary support of `s3` using `tensorflow`
+- Working on secondary support of `s3` using `aioaws`
+- Planning to integrate `async` support
+- Planning to add deeper integration with `smart_open`
+- Planning to add support for `supabase` storage
+- Started adding auto-auth support: `s3`, `gs`, `supabase`
+- Added `compat` module for previous `File` API to prevent breakage
+    - All previous `File` APIs are still usable.
+    - Does not check for `tensorflow` dependency. So using without `tensorflow` will break
+
+
 Aug 3, 2021 - v0.1.16
 - A lot. But its pretty lazily done.
 
@@ -208,3 +173,59 @@ May 12, 2021 - v0.1.0
     - File.bcopy
 - Added TFDSIODataset
 
+
+## Previous Version
+
+```python
+from fileio import File
+
+'''
+Recognized File Extensions
+
+.json               - json
+.jsonl/.jsonlines   - jsonlines
+.csv                - csv
+.tsv                - tsv with "\t" seperator
+.txt                - txtlines
+.pkl                - pickle
+.pt                 - pytorch
+.tfrecords          - tensorflow
+'''
+
+# Main auto classes
+File.open(filename, mode='r', auto=True, device=None) # device is specific to pytorch. Set auto=False to get a barebones Posix via Gfile
+File.save(data, filename, overwrite=False) # if not overwrite, will attempt to append for newline files
+File.load(filenames, device=None) # yields generators per file, meaning you can have different file types
+File.download(url, dirpath=None, filename=None, overwrite=False) # Downloads a single url
+File.gdown(url, extract=True, verbose=False) # uses gdown lib to grab a google drive drive
+
+# Main i/o classes (Not Binary)
+File.read(filename) # 'r'
+File.write(filename) # 'w'
+File.append(filename) # 'a'
+
+# Binary
+File.wb(filename) # 'wb'
+File.rb(filename) # 'rb'
+
+
+# Batch downloaders
+File.batch_download(urls, directory=None, overwrite=False) # downloads all urls into a directory, skipping if overwrite = True and exists
+File.batch_gdown(urls, directory=None, extract=True, verbose=False) # downloads all gdrive urls to a directory
+
+# Extension Specific 
+
+# .json
+File.jsonload(filename)
+File.jsondump(dict, filename)
+
+# .jsonl/.jsonlines (Single File)
+File.jlg(filename)
+File.jlw(data, filename, mode='auto', verbose=True)
+
+# Multifile Readers
+
+# .jsonl/.jsonlines
+File.jgs(filenames)
+
+```

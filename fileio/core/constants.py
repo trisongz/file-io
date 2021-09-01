@@ -1,25 +1,7 @@
-"""
-adapted from https://github.com/tensorflow/datasets/blob/v4.4.0/tensorflow_datasets/core/constants.py
-"""
-
-
 import os
 from typing import List, Optional
-
-
-from fileio.src import type_utils
-
-# Github base URL
-SRC_BASE_URL = 'https://github.com/tensorflow/datasets/tree/master/'
-
-# Directory where to store processed datasets.
-# If modifying this, should also update `scripts/cli/build.py` `--data_dir`
-DATA_DIR = os.environ.get('FILEIO_DATA_DIR', os.path.join('~', 'fileio'))
-
-# Suffix of files / directories which aren't finished downloading / extracting.
-INCOMPLETE_SUFFIX = '.incomplete'
-
-# Note: GCS constants are defined in `src/gcs_utils.py`
+from fileio.core import type_utils
+from fileio.configs import DATA_DIR
 
 _registered_data_dir = set()
 
@@ -52,16 +34,12 @@ def list_data_dirs(given_data_dir: Optional[str] = None,) -> List[str]:
         The list of all data_dirs to look-up.
     """
     # If the data dir is explicitly given, no need to search everywhere.
-    if given_data_dir:
-        return [given_data_dir]
-    else:
-        all_data_dirs = _registered_data_dir | {DATA_DIR}
-        return sorted(os.path.expanduser(d) for d in all_data_dirs)
+    if given_data_dir: return [given_data_dir]
+    all_data_dirs = _registered_data_dir | {DATA_DIR}
+    return sorted(os.path.expanduser(d) for d in all_data_dirs)
 
 
 def get_default_data_dir(given_data_dir: Optional[str] = None,) -> str:
     """Returns the default data_dir."""
-    if given_data_dir:
-        return os.path.expanduser(given_data_dir)
-    else:
-        return os.path.expanduser(DATA_DIR)
+    if given_data_dir: return os.path.expanduser(given_data_dir)
+    return os.path.expanduser(DATA_DIR)

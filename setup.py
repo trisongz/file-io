@@ -2,34 +2,35 @@ import os
 import sys
 from setuptools import setup, find_packages
 
+
+version = '0.3.0alpha'
+binary_names = ['fileio']
+pkg_name = 'fileio'
+
 root = os.path.abspath(os.path.dirname(__file__))
+packages = find_packages(
+        include=[
+            pkg_name, "{}.*".format(pkg_name)
+        ]
+    )
 
-package_name = "fileio"
-packages = find_packages(include=[package_name, "{}.*".format(package_name)])
-
-_locals = {}
-with open(os.path.join(package_name, "_version.py")) as fp:
-    exec(fp.read(), None, _locals)
-
-version = _locals["__version__"]
-binary_names = _locals["binary_names"]
 
 deps = {
     'main': [
         'tqdm',
-        'gdown',
         'requests',
         'pyyaml',
         'pysimdjson',
+        'smart_open[all]',
+        #'gdown',
+        #'aioaws',
         #'tensorflow>=1.15.0',
     ],
     'extras':{
         'gcp': ['google-api-python-client', 'google-compute-engine', 'google-cloud-storage', 'oauth2client'],
-        'cloud': ['smart_open[all]']
 
     }
 }
-
 
 with open(os.path.join(root, 'README.md'), 'rb') as readme:
     long_description = readme.read().decode('utf-8')
