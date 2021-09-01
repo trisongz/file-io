@@ -12,3 +12,5 @@ workspace.code-workspace
 .DS_Store
 fileio/tests/test3.py
 fileio/tests/test2.py
+_fileio/*
+tests/*

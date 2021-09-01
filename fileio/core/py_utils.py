@@ -1,34 +1,26 @@
-
-"""Some python utils function and classes.
-adapted from https://github.com/tensorflow/datasets/blob/v4.4.0/tensorflow_datasets/core/utils/py_utils.py
-"""
-
-
+import os
+import io
+import sys
 import base64
 import contextlib
 import functools
-import io
+import uuid
 import itertools
 import logging
-import os
 import random
 import shutil
 import string
-import sys
 import textwrap
 import threading
 import typing
-from typing import Any, Callable, Iterator, List, NoReturn, Optional, Tuple, Type, TypeVar, Union
-import uuid
-
+import inspect
 from six.moves import urllib
-from ..utils import lazy_import
-tf = lazy_import('tensorflow.compat.v2')
+from typing import Any, Callable, Iterator, List, NoReturn, Optional, Tuple, Type, TypeVar, Union
 
-
-from fileio.src import constants
-from fileio.src import file_adapters
-from fileio.src import type_utils
+from fileio.core import constants
+from fileio.core import file_adapters
+from fileio.core import type_utils
+from fileio.core.libs import TF_FUNC
 
 Tree = type_utils.Tree
 
@@ -115,14 +107,14 @@ class NonMutableDict(dict):
         return super(NonMutableDict, self).update(other)
 
 
-class classproperty(property):    # pylint: disable=invalid-name
+class classproperty(property):
     """Descriptor to be used as decorator for @classmethods."""
 
     def __get__(self, obj, objtype=None):
-        return self.fget.__get__(None, objtype)()    # pytype: disable=attribute-error
+        return self.fget.__get__(None, objtype)()
 
 
-class memoized_property(property):    # pylint: disable=invalid-name
+class memoized_property(property):
     """Descriptor that mimics @property but caches output in member variable."""
 
     def __get__(self, obj, objtype=None):
@@ -134,7 +126,7 @@ class memoized_property(property):    # pylint: disable=invalid-name
         attr = '__cached_' + self.fget.__name__    # pytype: disable=attribute-error
         cached = getattr(obj, attr, None)
         if cached is None:
-            cached = self.fget(obj)    # pytype: disable=attribute-error
+            cached = self.fget(obj)
             setattr(obj, attr, cached)
         return cached
 
@@ -211,7 +203,7 @@ def flatten_nest_dict(d):
 # users to compile from source.
 def flatten_with_path(
         structure: Tree[T],
-) -> Iterator[Tuple[Tuple[Union[str, int], ...], T]]:    # pytype: disable=invalid-annotation
+) -> Iterator[Tuple[Tuple[Union[str, int], ...], T]]:
     """Convert a TreeDict into a flat list of paths and their values.
     ```py
     flatten_with_path({'a': {'b': v}}) == [(('a', 'b'), v)]
@@ -286,13 +278,13 @@ def incomplete_dir(dirname: type_utils.PathLike) -> Iterator[str]:
     """Create temporary dir for dirname and rename on exit."""
     dirname = os.fspath(dirname)
     tmp_dir = _get_incomplete_path(dirname)
-    tf.io.gfile.makedirs(tmp_dir)
+    TF_FUNC.io.gfile.makedirs(tmp_dir)
     try:
         yield tmp_dir
-        tf.io.gfile.rename(tmp_dir, dirname)
+        TF_FUNC.io.gfile.rename(tmp_dir, dirname)
     finally:
-        if tf.io.gfile.exists(tmp_dir):
-            tf.io.gfile.rmtree(tmp_dir)
+        if TF_FUNC.io.gfile.exists(tmp_dir):
+            TF_FUNC.io.gfile.rmtree(tmp_dir)
 
 
 @contextlib.contextmanager
@@ -312,9 +304,9 @@ def incomplete_file(
 def atomic_write(path, mode):
     """Writes to path atomically, by writing to temp file and renaming it."""
     tmp_path = '%s%s_%s' % (path, constants.INCOMPLETE_SUFFIX, uuid.uuid4().hex)
-    with tf.io.gfile.GFile(tmp_path, mode) as file_:
+    with TF_FUNC.io.gfile.GFile(tmp_path, mode) as file_:
         yield file_
-    tf.io.gfile.rename(tmp_path, path, overwrite=True)
+    TF_FUNC.io.gfile.rename(tmp_path, path, overwrite=True)
 
 
 def reraise(
@@ -456,8 +448,8 @@ def list_info_files(dir_path: type_utils.PathLike) -> List[str]:
     """Returns name of info files within dir_path."""
     path = os.fspath(dir_path)
     return [
-            fname for fname in tf.io.gfile.listdir(path)
-            if not tf.io.gfile.isdir(os.path.join(path, fname)) and
+            fname for fname in TF_FUNC.io.gfile.listdir(path)
+            if not TF_FUNC.io.gfile.isdir(os.path.join(path, fname)) and
             not file_adapters.is_example_file(fname)
     ]
 
@@ -482,3 +474,88 @@ def add_sys_path(path: type_utils.PathLike) -> Iterator[None]:
         yield
     finally:
         sys.path.remove(path)
+
+
+WORKAROUND_SCHEMES = ['s3', 's3n', 's3u', 's3a', 'gs']
+QUESTION_MARK_PLACEHOLDER = '///fileio.core.py_utils.QUESTION_MARK_PLACEHOLDER///'
+
+
+
+def inspect_kwargs(kallable):
+    try:
+        signature = inspect.signature(kallable)
+    except AttributeError:
+        try:
+            args, varargs, keywords, defaults = inspect.getargspec(kallable)
+        except TypeError:
+            return {}
+
+        if not defaults:
+            return {}
+        supported_keywords = args[-len(defaults):]
+        return dict(zip(supported_keywords, defaults))
+    else:
+        return {
+            name: param.default
+            for name, param in signature.parameters.items()
+            if param.default != inspect.Parameter.empty
+        }
+
+
+def check_kwargs(kallable, kwargs):
+    """Check which keyword arguments the callable supports.
+    Parameters
+    ----------
+    kallable: callable
+        A function or method to test
+    kwargs: dict
+        The keyword arguments to check.  If the callable doesn't support any
+        of these, a warning message will get printed.
+    Returns
+    -------
+    dict
+        A dictionary of argument names and values supported by the callable.
+    """
+    supported_keywords = sorted(inspect_kwargs(kallable))
+    #unsupported_keywords = [k for k in sorted(kwargs) if k not in supported_keywords]
+    supported_kwargs = {k: v for (k, v) in kwargs.items() if k in supported_keywords}
+
+    return supported_kwargs
+
+
+def safe_urlsplit(url):
+    """This is a hack to prevent the regular urlsplit from splitting around question marks.
+    A question mark (?) in a URL typically indicates the start of a
+    querystring, and the standard library's urlparse function handles the
+    querystring separately.  Unfortunately, question marks can also appear
+    _inside_ the actual URL for some schemas like S3, GS.
+    Replaces question marks with a special placeholder substring prior to
+    splitting.  This work-around behavior is disabled in the unlikely event the
+    placeholder is already part of the URL.  If this affects you, consider
+    changing the value of QUESTION_MARK_PLACEHOLDER to something more suitable.
+    See Also
+    --------
+    https://bugs.python.org/issue43882
+    https://github.com/python/cpython/blob/3.7/Lib/urllib/parse.py
+    https://github.com/RaRe-Technologies/smart_open/issues/285
+    https://github.com/RaRe-Technologies/smart_open/issues/458
+    smart_open/utils.py:QUESTION_MARK_PLACEHOLDER
+    """
+    sr = urllib.parse.urlsplit(url, allow_fragments=False)
+
+    placeholder = None
+    if sr.scheme in WORKAROUND_SCHEMES and '?' in url and QUESTION_MARK_PLACEHOLDER not in url:
+        #
+        # This is safe because people will _almost never_ use the below
+        # substring in a URL.  If they do, then they're asking for trouble,
+        # and this special handling will simply not happen for them.
+        #
+        placeholder = QUESTION_MARK_PLACEHOLDER
+        url = url.replace('?', placeholder)
+        sr = urllib.parse.urlsplit(url, allow_fragments=False)
+
+    if placeholder is None:
+        return sr
+
+    path = sr.path.replace(placeholder, '?')
+    return urllib.parse.SplitResult(sr.scheme, sr.netloc, path, '', '')

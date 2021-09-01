@@ -3,12 +3,14 @@
 adapted from https://github.com/tensorflow/datasets/blob/v4.4.0/tensorflow_datasets/core/utils/generic_path.py
 """
 
+
 import os
 import typing
-from typing import Callable, Dict, Tuple, Type, Union, TypeVar
+from typing import Callable, Dict, Tuple, Type, Union, TypeVar, List
 
-from fileio.src import gpath
-from fileio.src import type_utils
+from fileio.core import iopath
+from fileio.core import type_utils
+from fileio.core.libs import GCS_METHOD
 
 PathLike = type_utils.PathLike
 ReadOnlyPath = type_utils.ReadOnlyPath
@@ -18,16 +20,18 @@ PathLikeCls = Union[Type[ReadOnlyPath], Type[ReadWritePath]]
 T = TypeVar('T')
 
 _PATHLIKE_CLS: Tuple[PathLikeCls, ...] = (
-    gpath.PosixGPath,
-    gpath.WindowsGPath,
+    iopath.PosixGCSPath,
+    iopath.PosixS3Path,
+    iopath.PosixIOPath,
+    iopath.WindowsGPath,
 )
 _URI_PREFIXES_TO_CLS: Dict[str, PathLikeCls] = {
     # Even on Windows, `gs://`,... are PosixPath
-    uri_prefix: gpath.PosixGPath for uri_prefix in gpath.URI_PREFIXES
+    'gs://': iopath.PosixIOPath if GCS_METHOD == 'tf' else iopath.PosixGCSPath,
+    's3://': iopath.PosixIOPath if GCS_METHOD == 'tf' else iopath.PosixGCSPath,
 }
 
 
-# pylint: disable=g-wrong-blank-lines
 @typing.overload
 def register_pathlike_cls(path_cls_or_uri_prefix: str) -> Callable[[T], T]:
     ...
@@ -65,9 +69,6 @@ def register_pathlike_cls(path_cls_or_uri_prefix):
         return path_cls_or_uri_prefix
 
 
-# pylint: enable=g-wrong-blank-lines
-
-
 def as_path(path: PathLike) -> ReadWritePath:
     """Create a generic `pathlib.Path`-like abstraction.
     Depending on the input (e.g. `gs://`, `github://`, `ResourcePath`,...), the
@@ -83,16 +84,26 @@ def as_path(path: PathLike) -> ReadWritePath:
         uri_splits = path.split('://', maxsplit=1)
         if len(uri_splits) > 1:    # str is URI (e.g. `gs://`, `github://`,...)
             # On windows, `PosixGPath` is created for `gs://` paths
-            return _URI_PREFIXES_TO_CLS[uri_splits[0] + '://'](path)    # pytype: disable=bad-return-type
+            return _URI_PREFIXES_TO_CLS[uri_splits[0] + '://'](path)
         elif is_windows:
-            return gpath.WindowsGPath(path)
+            return iopath.WindowsGPath(path)
         else:
-            return gpath.PosixGPath(path)
+            return iopath.PosixIOPath(path)
     elif isinstance(path, _PATHLIKE_CLS):
-        return path    # Forward resource path, gpath,... as-is    # pytype: disable=bad-return-type
+        return path
     elif isinstance(path, os.PathLike):    # Other `os.fspath` compatible objects
-        path_cls = gpath.WindowsGPath if is_windows else gpath.PosixGPath
+        path_cls = iopath.WindowsGPath if is_windows else iopath.PosixIOPath
         return path_cls(path)
     else:
         raise TypeError(f'Invalid path type: {path!r}')
 
+
+def get_pathlike(filepath: Union[str, PathLike]):
+    if isinstance(filepath, str): filepath = as_path(filepath)
+    return filepath
+
+def filter_files(files: List[Union[str, PathLike]], include=[], exclude=['.git']):
+    files = [get_pathlike(f) for f in files]
+    if include: files = [f for f in files if bool(set(f.parts).intersection(include))]
+    if exclude: files = [f for f in files if not bool(set(f.parts).intersection(exclude))]
+    return files
