@@ -73,7 +73,7 @@ class File(object):
             return os.path.expanduser("~")
         _dir = os.path.join(os.path.expanduser("~"), path, *paths)
         for k in ['mkdir', 'mkdirs', 'makedir', 'makedirs']:
-            if kwargs.get(k): gfile.mkadirs(_dir)
+            if kwargs.get(k): gfile.makedirs(_dir)
         return _dir
     
     @classmethod

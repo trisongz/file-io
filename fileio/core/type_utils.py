@@ -305,7 +305,7 @@ class ReadWritePath(ReadOnlyPath, Protocol):
     def write_json(self, data: Json, ensure_ascii: bool = False, indent: int = 2, **kwargs) -> None:
         """Writes content as str."""
         with self.open('w') as f:
-            return JSON_FUNC.dump(data, ensure_ascii=ensure_ascii, indent=indent, **kwargs)
+            return JSON_FUNC.dump(data, f, ensure_ascii=ensure_ascii, indent=indent, **kwargs)
     
     def write_jsonl(self, data: List[Json], mode: str = 'auto', newline: str = '\n', ignore_errors: bool = True, **kwargs) -> None:
         """Writes content as str."""
