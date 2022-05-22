@@ -1,56 +1,56 @@
-import os 
 import sys
+from pathlib import Path
 from setuptools import setup, find_packages
 
+if sys.version_info.major != 3:
+    raise RuntimeError("This package requires Python 3+")
 
-version = '0.3.0alpha'
-binary_names = ['fileio']
-pkg_name = 'fileio'
+version = '0.3.1'
+pkg_name = 'file-io'
+gitrepo = 'trisongz/file-io'
+root = Path(__file__).parent
 
-root = os.path.abspath(os.path.dirname(__file__))
-packages = find_packages(
-        include=[
-            pkg_name, "{}.*".format(pkg_name)
-        ]
-    )
+requirements = [
+    'anyio',
+    'aiofile',
+    #'aiopath', # remove deps as 3.10 vs 3.9 is different
+    'fsspec',
+    'loguru',
+    #'typer',
+    #'universal_pathlib',
+]
 
+extras = {
+    'gcs': ['gcsfs'],
+    's3': ['s3fs'], 
+    'cloud': ['gcsfs', 's3fs'],
+}
+# pip install fileio[cloud]
 
-deps = {
-    'main': [
-        'tqdm',
-        'requests',
-        'pyyaml',
-        'pysimdjson',
-        'smart_open[all]',
-        #'gdown',
-        #'aioaws',
-        #'tensorflow>=1.15.0',
-    ],
-    'extras':{
-        'gcp': ['google-api-python-client', 'google-compute-engine', 'google-cloud-storage', 'oauth2client'],
-
-    }
+args = {
+    'packages': find_packages(include = ['fileio', 'fileio.*']),
+    'install_requires': requirements,
+    'include_package_data': True,
+    'long_description': root.joinpath('README.md').read_text(encoding='utf-8'),
+    'entry_points': {}
 }
 
-with open(os.path.join(root, 'README.md'), 'rb') as readme:
-    long_description = readme.read().decode('utf-8')
+if extras: args['extras_require'] = extras
 
 setup(
-    name="file_io",
-    version=version,
-    description="Deterministic File Lib to make working with Files across Object Storage easier",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
+    name = pkg_name,
+    version = version,
+    url=f'https://github.com/{gitrepo}',
+    license='MIT Style',
+    description='Deterministic File Lib to make working with Files across Object Storage easier',
     author='Tri Songz',
     author_email='ts@growthengineai.com',
-    url='http://github.com/trisongz/file-io',
-    python_requires='>=3.6',
-    install_requires=deps['main'],
-    extras_require=deps['extras'],
-    packages=packages,
+    long_description_content_type="text/markdown",
     classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Environment :: Console",
-        "Intended Audience :: Developers",
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3.7',
+        'Topic :: Software Development :: Libraries',
     ],
+    **args
 )

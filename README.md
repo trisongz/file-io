@@ -1,26 +1,30 @@
 # file_io
  Deterministic File Lib to make working with Files across Object Storage easier
 
-**Deprecation Notice**
-
-`fileio.File` will soon be deprecated in favor of `fileio.PathIO`.
-
 ## Quickstart
 
 ```python
-!pip install --upgrade git+https://github.com/trisongz/file_io.git
+!pip install --upgrade git+https://github.com/trisongz/file-io.git
 !pip install --upgrade file-io
 
 
-from fileio import PathIO
+from fileio import File
 
-pathlike = PathIO('gs://path/to/item.txt')
-pathlike = PathIO('s3://path/to/item.txt')
+pathlike = File('gs://path/to/item.txt')
+pathlike = File('s3://path/to/item.txt')
 
 
 ```
 
 ### Changelogs
+
+
+---
+May 21, 2022 v0.3.1
+
+- Complete Overhaul and refactor.
+
+
 ---
 Aug 31, 2021 v0.3.0alpha
 
