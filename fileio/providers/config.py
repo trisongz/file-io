@@ -148,18 +148,22 @@ class CloudConfig(ConfigModel):
         if self.aws_access_key_id:
             os.system['AWS_ACCESS_KEY_ID'] = self.aws_access_key_id
             os.system['AWS_SECRET_ACCESS_KEY'] = self.aws_secret_access_key
+        
+        if self.minio_endpoint:
+            os.system['MINIO_ENDPOINT'] = self.minio_endpoint
         if self.set_s3_endpoint:
             os.system['S3_ENDPOINT'] = self.get_s3_endpoint()
         if self.minio_access_key:
             os.system['MINIO_ACCESS_KEY'] = self.minio_access_key
             os.system['MINIO_SECRET_KEY'] = self.minio_secret_key
-        if self.minio_endpoint:
-            os.system['MINIO_ENDPOINT'] = self.minio_endpoint
+        
 
     def update_auth(self, **config):
         self.update_config(**config)
         self.set_auth_env()
-        
+    
+    class Config:
+        env_prefix = ""
         
 
 
