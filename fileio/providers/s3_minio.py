@@ -70,8 +70,42 @@ class FileMinioPath(CloudFileSystemPath):
         """
         Returns the `__fspath__` string representation without the uri_scheme
         """
-        if self._prefix in self.parts[0]: return self._pathlike.join(*self.parts[1:])
+        #if self._prefix in self.parts[0]: return self._pathlike.join(*self.parts[1:])
+        #return self._pathlike.join(*self.parts)
+        if self._prefix in self.parts[0] or self._posix_prefix in self.parts[0]: return self._pathlike.join(*self.parts[1:])
         return self._pathlike.join(*self.parts)
+    
+    @property
+    def _s3_cloudstr(self) -> str:
+        """
+        Reconstructs the proper cloud URI
+        """
+        if self._prefix not in self.parts[0] and self._posix_prefix not in self.parts[0]:
+            return f'{self._posix_prefix}://' + '/'.join(self.parts)
+        return f'{self._posix_prefix}://' + '/'.join(self.parts[1:])
+
+    def find(self, pattern: str = "*",  as_string: bool = False, maxdepth: int = None, withdirs: bool = None, detail: bool = False) -> Union[List[str], List[Type['CloudFileSystemPath']]]:
+        """
+        List all files below path. Like posix find command without conditions
+        """
+        matches = self._accessor.find(path = self._s3_cloudstr, maxdepth = maxdepth, withdirs = withdirs, detail = detail, prefix = pattern)
+        if self.is_cloud:
+            matches = [f'{self._prefix}://{m}' for m in matches]
+        if not as_string:
+            matches = [type(self)(m) for m in matches]
+        return matches
+    
+    async def async_find(self, pattern: str = "*",  as_string: bool = False, maxdepth: int = None, withdirs: bool = None, detail: bool = False) -> Union[List[str], List[Type['CloudFileSystemPath']]]:
+        """
+        List all files below path. Like posix find command without conditions
+        """
+        matches = await self._accessor.async_find(path = self._s3_cloudstr, maxdepth = maxdepth, withdirs = withdirs, detail = detail, prefix = pattern)
+        if self.is_cloud:
+            matches = [f'{self._prefix}://{m}' for m in matches]
+        if not as_string:
+            matches = [type(self)(m) for m in matches]
+        return matches
+
 
 class FileMinioPosixPath(PosixPath, FileMinioPath, PureFileMinioPosixPath):
     __slots__ = ()
