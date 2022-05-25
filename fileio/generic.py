@@ -63,6 +63,7 @@ PathLike = Union[str, os.PathLike, FileLike]
 _PREFIXES_TO_CLS: Dict[str, FileLike] = {
     'gs://': FileGSPath,
     's3://': FileS3Path,
+    #'s3a://': FileMinioPath,
     'mio://': FileMinioPath,
     'minio://': FileMinioPath,
     #'minio://': cloud.PosixMinioPath,

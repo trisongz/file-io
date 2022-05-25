@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import datetime
+from loguru import logger
 from typing import ClassVar
 from .base import *
 from ..flavours import _pathz_windows_flavour, _pathz_posix_flavour
@@ -863,7 +864,9 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             if self.is_cloud: matches = [f'{self._prefix}://{m}' for m in matches]
             if as_path: matches = [type(self)(m) for m in matches]
             return matches
-        except: return await self.async_find(pattern = pattern, as_string = not as_path)
+        except Exception as e: 
+            logger.error(e)
+            return await self.async_find(pattern = pattern, as_string = not as_path)
 
     def find(self, pattern: str = "*",  as_string: bool = False, maxdepth: int = None, withdirs: bool = None, detail: bool = False) -> Union[List[str], List[Type['CloudFileSystemPath']]]:
         """

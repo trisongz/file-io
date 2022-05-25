@@ -58,7 +58,7 @@ class CloudFileSystemType(type):
         cls.fs = s3fs.S3FileSystem(asynchronous=False, **_config)
         cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **_config))
     
-    #@classmethod
+    #classmethod
     def build_minio(cls, **auth_config):
         from .._modules import LibModule
         from .config import CloudConfig

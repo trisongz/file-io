@@ -15,3 +15,4 @@ fileio/tests/test2.py
 _fileio/*
 tests/*
 **_setup.py**
+**test**

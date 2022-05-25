@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-
+from loguru import logger
 from .base import *
 from .filesystem_base import Minio_CloudFileSystem
 from .filesystem_pathlib import *
@@ -84,6 +84,42 @@ class FileMinioPath(CloudFileSystemPath):
             return f'{self._posix_prefix}://' + '/'.join(self.parts)
         return f'{self._posix_prefix}://' + '/'.join(self.parts[1:])
 
+    
+    def glob(self, pattern: str = '*', as_path: bool = True) -> Iterable[Union[str, Type['CloudFileSystemPath']]]:
+        """Iterate over this subtree and yield all existing files (of any
+        kind, including directories) matching the given relative pattern.
+        Warning: doesn't work as expected. Use Find Instead.
+        """
+        if not pattern: raise ValueError("Unacceptable pattern: {!r}".format(pattern))
+        #if self.is_cloud:
+        glob_pattern = self._s3_cloudstr + ('/' if self.is_dir and not self._path.endswith('/') and not pattern.startswith('/') else '') +  pattern
+        try: 
+            matches =  self._accessor.glob(glob_pattern)
+            if not matches: return matches
+            if self.is_cloud: matches = [f'{self._prefix}://{m}' for m in matches]
+            if as_path: matches = [type(self)(m) for m in matches]
+            return matches
+        except Exception as e: 
+            logger.error(e)
+            return self.find(pattern = pattern, as_string = not as_path)
+
+    async def async_glob(self, pattern: str = '*', as_path: bool = True) -> AsyncIterable[Type['CloudFileSystemPath']]:
+        """Iterate over this subtree and yield all existing files (of any
+        kind, including directories) matching the given relative pattern.
+        """
+        if not pattern: raise ValueError("Unacceptable pattern: {!r}".format(pattern))
+        glob_pattern = self._s3_cloudstr + ('/' if self.is_dir and not self._path.endswith('/') and not pattern.startswith('/') else '') +  pattern
+        try: 
+            matches = await self._accessor.async_glob(glob_pattern)
+            #logger.info(glob_pattern)
+            if not matches: return matches
+            if self.is_cloud: matches = [f'{self._prefix}://{m}' for m in matches]
+            if as_path: matches = [type(self)(m) for m in matches]
+            return matches
+        except Exception as e: 
+            logger.error(e)
+            return await self.async_find(pattern = pattern, as_string = not as_path)
+    
     def find(self, pattern: str = "*",  as_string: bool = False, maxdepth: int = None, withdirs: bool = None, detail: bool = False) -> Union[List[str], List[Type['CloudFileSystemPath']]]:
         """
         List all files below path. Like posix find command without conditions
