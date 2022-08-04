@@ -18,6 +18,7 @@ from operator import attrgetter
 from stat import S_ISDIR, S_ISLNK, S_ISREG, S_ISSOCK, S_ISBLK, S_ISCHR, S_ISFIFO
 from urllib.parse import quote_from_bytes as urlquote_from_bytes
 
+from .utils import get_file_info
 
 supports_symlinks = True
 if os.name == 'nt':
@@ -412,6 +413,8 @@ class _Accessor:
 class _NormalAccessor(_Accessor):
 
     stat = os.stat
+
+    info = get_file_info
 
     lstat = os.lstat
 
@@ -1038,6 +1041,7 @@ class PurePath(object):
                 return False
         return True
 
+
 # Can't subclass os.PathLike from PurePath and keep the constructor
 # optimizations in PurePath._parse_args().
 os.PathLike.register(PurePath)
@@ -1233,6 +1237,13 @@ class Path(PurePath):
         os.stat() does.
         """
         return self._accessor.stat(self)
+    
+    def info(self):
+        """
+        Return the result of the stat() system call on this path, like
+        os.stat() does.
+        """
+        return self._accessor.info(self.as_posix())
 
     def owner(self):
         """

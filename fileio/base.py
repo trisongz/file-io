@@ -10,7 +10,7 @@ from .base_imports import *
 from .aiopath.selectors import _make_selector
 from .aiopath.scandir import EntryWrapper, scandir_async, _scandir_results
 from .flavours import _pathz_windows_flavour, _pathz_posix_flavour
-
+from .utils import get_file_info
 
 def scandir_sync(*args, **kwargs) -> Iterable[EntryWrapper]:
     results = _scandir_results(*args, **kwargs)
@@ -43,6 +43,8 @@ def calc_etag(inputfile: 'FilePath', partsize: int = 8388608):
 class _FileAccessor(NormalAccessor):
     # Sync methods
     stat = os.stat
+    info = get_file_info
+
     lstat = os.lstat
     open = os.open
     listdir = os.listdir
@@ -53,6 +55,8 @@ class _FileAccessor(NormalAccessor):
 
     # Async Methods
     async_stat = func_as_method_coro(os.stat)
+    async_info = func_as_method_coro(get_file_info)
+
     async_lstat = func_as_method_coro(os.lstat)
     async_open = func_as_method_coro(os.open)
     async_listdir = func_as_method_coro(os.listdir)
@@ -1049,6 +1053,20 @@ class FilePath(Path, FilePurePath):
         os.stat() does.
         """
         return await self._accessor.async_stat(self)
+    
+    def info(self) -> Dict[str, Any]:
+        """
+        Return the result of the stat() system call on this path, like
+        os.stat() does.
+        """
+        return self._accessor.info(self)
+    
+    async def async_info(self) -> Dict[str, Any]:
+        """
+        Return the result of the stat() system call on this path, like
+        os.stat() does.
+        """
+        return await self._accessor.async_info(self)
 
     def lstat(self) -> stat_result:
         """
