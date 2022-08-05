@@ -22,7 +22,8 @@ requirements = [
 
 extras = {
     'gcs': ['gcsfs'],
-    's3': ['s3fs'], 
+    's3': ['s3fs', 'boto3'], 
+    #'s3': ['s3fs', 'aiobotocore[awscli]'], 
     'cloud': ['gcsfs', 's3fs'],
 }
 # pip install fileio[cloud]

@@ -6,7 +6,7 @@ from loguru import logger
 from typing import ClassVar
 from .base import *
 from ..flavours import _pathz_windows_flavour, _pathz_posix_flavour
-
+from ..aiopath.wrap import to_thread
 
 if TYPE_CHECKING:
     try: from ..generic import PathLike
@@ -122,6 +122,18 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         if self._bucket in self.parts[0]: return self._pathlike.join(*self.parts[1:])
         if self._bucket in self.parts[1]: return self._pathlike.join(*self.parts[2:])
         return self._pathlike.join(*self.parts)
+    
+    def get_path_key(self, filename: Optional[str] = None) -> str:
+        """
+        Used to return relative/path/to/file.ext
+        """
+        filename = filename or self.name
+        parts = None
+        if self._bucket in self.parts[0]: parts = self.parts[1:-1]
+        elif self._bucket in self.parts[1]: parts = self.parts[2:-1]
+        else: parts = self.parts[:-1]
+        return self._pathlike.join(*parts, filename)
+
     
     @property
     def _cloudstr(self) -> str:

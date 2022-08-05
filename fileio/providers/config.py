@@ -7,6 +7,7 @@ Cloud Provider Configs
 import os
 import json
 import pathlib
+import multiprocessing as mp
 from typing import Optional, Union, Any, Dict, TYPE_CHECKING
 
 from pydantic import Json
@@ -65,6 +66,8 @@ class CloudConfig(ConfigModel):
     s3compat_secret_key: Optional[str] = ""
     s3compat_access_token: Optional[str] = ""
     s3compat_config: Optional[Json] = None
+
+    max_workers: Optional[int] = mp.cpu_count() * 2
 
     def create_adc(self, data: Union[str, Dict[str, Any]], path: str = None):
         """

@@ -1,3 +1,4 @@
+
 from types import ModuleType
 from typing import Callable, Any, Optional, Coroutine, Type, Union, List, ClassVar
 
@@ -7,6 +8,12 @@ except ImportError: gcsfs: ModuleType = None
 try: import s3fs
 except ImportError: s3fs: ModuleType = None
 
+try: import boto3
+except ImportError: boto3: ModuleType = None
+
+#try: import botocore
+#except ImportError: botocore: ModuleType = None
+
 from .base import rewrite_async_syntax, NormalAccessor, func_as_method_coro
 
 
@@ -14,6 +21,9 @@ class CloudFileSystemType(type):
     fs: ModuleType = None
     fsa: ModuleType = None
     fs_name: str = None # gcsfs
+    boto: ModuleType = None
+    s3t: Callable = None
+    #s3t: 'boto3.s3.transfer.TransferManager' = None
 
     @classmethod
     def is_ready(cls):
@@ -45,6 +55,9 @@ class CloudFileSystemType(type):
 
         s3fs = LibModule.import_lib('s3fs')
         LibModule.reload_module(s3fs)
+        
+        boto3 = LibModule.import_lib('boto3')
+        LibModule.reload_module(boto3)
 
         authz = CloudConfig()
         if auth_config: authz.update_auth(**auth_config)
@@ -57,6 +70,20 @@ class CloudFileSystemType(type):
         if authz.s3_config: _config['config_kwargs'] = authz.s3_config
         cls.fs = s3fs.S3FileSystem(asynchronous=False, **_config)
         cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **_config))
+        
+        from botocore.config import Config as BotoConfig
+        import boto3.s3.transfer as s3transfer
+        boto_config = BotoConfig(max_pool_connections = authz.max_workers)
+        cls.boto = boto3.client('s3', region_name = authz.aws_region, config = boto_config)
+        transfer_config = s3transfer.TransferConfig(
+            use_threads = True,
+            max_concurrency = authz.max_workers,
+        )
+        def create_s3t(self):
+            return s3transfer.create_transfer_manager(cls.boto, transfer_config)
+        #cls.s3t = lambda: s3transfer.create_transfer_manager(cls.boto, transfer_config)
+        cls.s3t = create_s3t
+        #cls.s3t = s3transfer.create_transfer_manager(cls.boto, transfer_config)
     
     #classmethod
     def build_minio(cls, **auth_config):
@@ -66,9 +93,12 @@ class CloudFileSystemType(type):
         s3fs: ModuleType = LibModule.import_lib('s3fs')
         LibModule.reload_module(s3fs)
 
+        boto3 = LibModule.import_lib('boto3')
+        LibModule.reload_module(boto3)
+        
         authz = CloudConfig()
         if auth_config: authz.update_auth(**auth_config)
-        _config = {}
+        _config = {}        
         
         if authz.minio_secret_key:
             _config['key'] = authz.minio_access_key
@@ -79,6 +109,24 @@ class CloudFileSystemType(type):
         _config['config_kwargs']['signature_version'] = authz.minio_signature_ver
         cls.fs = s3fs.S3FileSystem(asynchronous=False, **_config)
         cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **_config))
+        
+        import boto3.s3.transfer as s3transfer
+        from botocore.config import Config as BotoConfig
+        
+        boto_config = BotoConfig(
+            signature_version = authz.minio_signature_ver,
+            max_pool_connections = authz.max_workers
+        )
+        cls.boto = boto3.client('s3', region_name = authz.aws_region, endpoint_url = authz.minio_endpoint, aws_access_key_id = authz.minio_access_key, aws_secret_access_key = authz.minio_secret_key, config = boto_config)
+        transfer_config = s3transfer.TransferConfig(
+            use_threads = True,
+            max_concurrency = authz.max_workers,
+        )
+        def create_s3t(self):
+            return s3transfer.create_transfer_manager(cls.boto, transfer_config)
+        
+        cls.s3t = create_s3t
+        #cls.s3t = s3transfer.create_transfer_manager(cls.boto, transfer_config)
 
     #@classmethod
     def build_filesystems(cls, force: bool = False, **auth_config):
@@ -194,6 +242,9 @@ class BaseAccessor(NormalAccessor):
     
     filesys: ClassVar = CloudFileSystem.fs
     async_filesys: ClassVar = CloudFileSystem.fsa
+
+    boto: ClassVar = CloudFileSystem.boto
+    s3t: Callable = CloudFileSystem.s3t
     
     # Async Methods
     async_stat: Callable = create_async_coro(CloudFileSystem, 'stat')
@@ -285,6 +336,8 @@ class BaseAccessor(NormalAccessor):
         
         cls.filesys = cls.CloudFileSystem.fs
         cls.async_filesys = cls.CloudFileSystem.fsa
+        cls.boto = cls.CloudFileSystem.boto
+        cls.s3t = cls.CloudFileSystem.s3t
         
         # Async Methods
         cls.async_stat: Callable = create_async_coro(cls.CloudFileSystem, 'stat')
@@ -339,12 +392,15 @@ class AWS_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 's3fs.S3FileSystem' = None
     fsa: 's3fs.S3FileSystem' = None
     fs_name: str = 's3fs'
+    boto: 'boto3.session.Session' = None
+    s3t: Callable = None
 
 class Minio_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 's3fs.S3FileSystem' = None
     fsa: 's3fs.S3FileSystem' = None
     fs_name: str = 'minio'
-
+    boto: 'boto3.session.Session' = None
+    s3t: Callable = None
 
 class GCP_Accessor(BaseAccessor):
     """
