@@ -252,6 +252,7 @@ class BaseAccessor(NormalAccessor):
     async_ukey: Callable = create_async_coro(CloudFileSystem, 'ukey')
     async_size: Callable = create_async_coro(CloudFileSystem, 'size')
     async_url: Callable = create_async_coro(CloudFileSystem, 'url')
+    async_setxattr: Callable = create_async_coro(CloudFileSystem, 'setxattr')
     async_modified: Callable = create_async_coro(CloudFileSystem, 'modified')
     async_invalidate_cache: Callable = create_async_coro(CloudFileSystem, 'invalidate_cache')
     async_rename: Callable = create_async_coro(CloudFileSystem, 'rename')
@@ -345,6 +346,8 @@ class BaseAccessor(NormalAccessor):
         cls.async_ukey: Callable = create_async_coro(cls.CloudFileSystem, 'ukey')
         cls.async_size: Callable = create_async_coro(cls.CloudFileSystem, 'size')
         cls.async_url: Callable = create_async_coro(cls.CloudFileSystem, 'url')
+        cls.async_setxattr: Callable = create_async_coro(cls.CloudFileSystem, 'setxattr')
+
         cls.async_modified: Callable = create_async_coro(cls.CloudFileSystem, 'modified')
         cls.async_invalidate_cache: Callable = create_async_coro(cls.CloudFileSystem, 'invalidate_cache')
         cls.async_rename: Callable = create_async_coro(cls.CloudFileSystem, 'rename')
@@ -353,8 +356,8 @@ class BaseAccessor(NormalAccessor):
         cls.async_info: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_info')
         cls.async_exists: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_exists')
 
-        cls.async_glob: Callable = create_async_coro(cls.CloudFileSystem, 'async_glob')
-        cls.async_glob: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_find')
+        cls.async_glob: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_glob')
+        cls.async_find: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_find')
         
         cls.async_cat: Callable = create_async_coro(cls.CloudFileSystem, 'async_cat')
         cls.async_cat_file: Callable = create_async_coro(cls.CloudFileSystem, 'async_cat_file')
