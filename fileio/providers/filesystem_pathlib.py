@@ -1249,14 +1249,14 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.put_file(src.string, self._cloudpath, callback=callback, **kwargs)
 
-    async def async_put_file(self, src: PathLike, callback: Optional[Callable] = None, **kwargs):
+    async def async_put_file(self, src: PathLike, **kwargs):
         """
         Copy single file to remote
         WIP support for cloud-to-cloud
         """
         src = self._get_pathlike(src)
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
-        return await self._accessor.async_put_file(src.string, self._cloudpath, callback=callback, **kwargs)
+        return await self._accessor.async_put_file(src.string, self._cloudpath, **kwargs)
 
     def get(self, dest: PathLike, recursive: bool = False, callback: Optional[Callable] = None, **kwargs):
         """
