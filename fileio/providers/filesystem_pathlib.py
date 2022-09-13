@@ -4,6 +4,7 @@ import os
 import datetime
 from loguru import logger
 from typing import ClassVar
+from fsspec.callbacks import Callback
 from .base import *
 from ..flavours import _pathz_windows_flavour, _pathz_posix_flavour
 from ..aiopath.wrap import to_thread
@@ -1222,7 +1223,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         else: await self._accessor.async_get(self._cloudpath, dest.string, recursive = recursive)
         return dest
 
-    def put(self, src: PathLike, recursive: bool = False, callback: Optional[Callable] = None, **kwargs):
+    def put(self, src: PathLike, recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy file(s) from src to this FilePath
         WIP support for cloud-to-cloud
@@ -1231,7 +1232,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.put(src.string, self._cloudpath, recursive=recursive, callback=callback, **kwargs)
 
-    async def async_put(self, src: PathLike, recursive: bool = False, callback: Optional[Callable] = None, **kwargs):
+    async def async_put(self, src: PathLike, recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy file(s) from src to this FilePath
         WIP support for cloud-to-cloud
@@ -1240,7 +1241,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return await self._accessor.async_put(src.string, self._cloudpath, recursive=recursive, callback=callback, **kwargs)
 
-    def put_file(self, src: PathLike, callback: Optional[Callable] = None, **kwargs):
+    def put_file(self, src: PathLike, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy single file to remote
         WIP support for cloud-to-cloud
@@ -1249,16 +1250,16 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.put_file(src.string, self._cloudpath, callback=callback, **kwargs)
 
-    async def async_put_file(self, src: PathLike, **kwargs):
+    async def async_put_file(self, src: PathLike, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy single file to remote
         WIP support for cloud-to-cloud
         """
         src = self._get_pathlike(src)
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
-        return await self._accessor.async_put_file(src.string, self._cloudpath, **kwargs)
+        return await self._accessor.async_put_file(src.string, self._cloudpath, callback=callback, **kwargs)
 
-    def get(self, dest: PathLike, recursive: bool = False, callback: Optional[Callable] = None, **kwargs):
+    def get(self, dest: PathLike, recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy the remote file(s) to dest (local)
         WIP support for cloud-to-cloud
@@ -1267,7 +1268,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not dest.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.get(self._cloudpath, dest.string, recursive=recursive, callback=callback, **kwargs)
 
-    async def async_get(self, dest: PathLike, recursive: bool = False, callback: Optional[Callable] = None, **kwargs):
+    async def async_get(self, dest: PathLike, recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy the remote file(s) to dest (local)
         WIP support for cloud-to-cloud
@@ -1276,7 +1277,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not dest.is_cloud, 'Cloud to Cloud support not supported at this time'
         return await self._accessor.async_get(self._cloudpath, dest.string, recursive=recursive, callback=callback, **kwargs)
 
-    def get_file(self, dest: PathLike, callback: Optional[Callable] = None, **kwargs):
+    def get_file(self, dest: PathLike, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copies this file to dest (local)
         WIP support for cloud-to-cloud
@@ -1285,7 +1286,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not dest.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.get_file(self._cloudpath, dest.string, callback=callback, **kwargs)
 
-    async def async_get_file(self, dest: PathLike, callback: Optional[Callable] = None, **kwargs):
+    async def async_get_file(self, dest: PathLike, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copies this file to dest (local)
         WIP support for cloud-to-cloud
