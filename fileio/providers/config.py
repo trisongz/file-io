@@ -114,7 +114,10 @@ class CloudConfig(ConfigModel):
         t += "\n[GSUtil]\n"
         t += "content_language = en\n"
         t += "default_api_version = 2\n"
-        if gcp_project := self.get_gcp_project():
+        gcp_project = self.get_gcp_project()
+        if gcp_project:
+            # for 3.7 compat.
+            #if gcp_project := self.get_gcp_project():
             t += f"default_project_id = {gcp_project}\n"
         return t
 
