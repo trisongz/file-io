@@ -88,6 +88,9 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
     def __repr__(self):
         return f'{self.__class__.__name__}("{self.string}")'
 
+    def __str__(self):
+        return self.string
+
     @property
     def _path(self) -> str:
         return self._cloudstr if self.is_cloud else str(self)
