@@ -679,7 +679,7 @@ class FilePath(Path, FilePurePath):
         """
         Remove this file or dir
         """
-        if self.is_dir: return self.rmdir(**kwargs)
+        if self.is_dir(): return self.rmdir(**kwargs)
         
         return self._accessor.remove(self)
     
@@ -687,7 +687,7 @@ class FilePath(Path, FilePurePath):
         """
         Remove this file or dir
         """
-        if self.is_dir: return await self.async_rmdir(**kwargs)
+        if self.async_is_dir(): return await self.async_rmdir(**kwargs)
         await self._accessor.async_remove(self)
 
     def rm_file(self, **kwargs):
