@@ -167,8 +167,7 @@ class LibModuleType(type):
     @staticmethod
     def get_cwd(*paths, string: bool = True) -> Union[str, pathlib.Path]:
         if not paths:
-            if string: return pathlib.Path.cwd().as_posix()
-            return pathlib.Path.cwd()
+            return pathlib.Path.cwd().as_posix() if string else pathlib.Path.cwd()
         if string: return pathlib.Path.cwd().joinpath(*paths).as_posix()
         return pathlib.Path.cwd().joinpath(*paths)
     
@@ -306,5 +305,5 @@ class LibModuleType(type):
         return cls.import_lib(r['library'], pip_name = r['pip_name'], resolve_missing = True, require = True)
 
         
-class LibModule(metaclass=LibModuleType):
+class LazyLib(metaclass=LibModuleType):
     pass

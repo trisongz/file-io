@@ -5,23 +5,19 @@ from stat import S_ISDIR, S_ISLNK, S_ISREG, S_ISSOCK, S_ISBLK, S_ISCHR, S_ISFIFO
 from typing import ClassVar
 from hashlib import md5
 
-from .types import *
-from .base_imports import *
-from .aiopath.selectors import _make_selector
-from .aiopath.scandir import EntryWrapper, scandir_async, _scandir_results
-from .flavours import _pathz_windows_flavour, _pathz_posix_flavour
-from .utils import get_file_info
+from fileio.types import *
+from fileio.core.imports import *
+from fileio.aiopath.selectors import _make_selector
+from fileio.aiopath.scandir import EntryWrapper, scandir_async, _scandir_results
+from fileio.core.flavours import _pathz_windows_flavour, _pathz_posix_flavour
+from fileio.utils import get_file_info
 
 def scandir_sync(*args, **kwargs) -> Iterable[EntryWrapper]:
-    results = _scandir_results(*args, **kwargs)
-    yield from results
+    yield from _scandir_results(*args, **kwargs)
 
 Paths = Union[Path, PathLike, str]
 close = func_to_async_func(os.close)
 sync_close = os.close
-
-
-
 
 def generate_checksum(p: 'FilePath'):
     with p.open('rb') as f:
@@ -35,9 +31,8 @@ def generate_checksum(p: 'FilePath'):
 def calc_etag(inputfile: 'FilePath', partsize: int = 8388608):
     md5_digests = []
     with inputfile.open('rb') as f:
-        for chunk in iter(lambda: f.read(partsize), b''):
-            md5_digests.append(md5(chunk).digest())
-    return md5(b''.join(md5_digests)).hexdigest() + '-' + str(len(md5_digests))
+        md5_digests.extend(md5(chunk).digest() for chunk in iter(lambda: f.read(partsize), b''))
+    return f"{md5(b''.join(md5_digests)).hexdigest()}-{len(md5_digests)}"
 
 
 class _FileAccessor(NormalAccessor):

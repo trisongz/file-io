@@ -9,12 +9,12 @@ from anyio import AsyncFile, open_file
 from aiofile import AIOFile, LineReader
 from typing import AsyncIterable, Union, TYPE_CHECKING, Optional, cast, Tuple
 
-from .._pathlib import Path
-from .types import Final, FileMode
+from fileio.core._pathlib import Path
+from fileio.types.common import Final, FileMode
 
 
 if TYPE_CHECKING:  # keep mypy quiet
-    from ..base import FilePath
+    from fileio.core.base import FilePath
 
 
 BEGINNING: Final[int] = 0

@@ -1,9 +1,10 @@
 import os
-from .baselib import pathlib
-from .base import *
-from .providers.gs_gcp import *
-from .providers.s3_aws import *
-from .providers.s3_minio import *
+
+from fileio.core.baselib import pathlib
+from fileio.core.base import *
+from fileio.providers.gs_gcp import *
+from fileio.providers.s3_aws import *
+from fileio.providers.s3_minio import *
 
 from typing import List, Dict, Union, Type, Tuple
 
@@ -26,7 +27,12 @@ FileLike = Union[
     Type[FileS3WindowsPath],
     Type[FileS3PosixPath],
     Type[PureFileS3WindowsPath],
-    Type[FileMinioPurePath], Type[FileMinioPath], Type[PureFileMinioPosixPath], Type[FileMinioWindowsPath], Type[FileMinioPosixPath], Type[PureFileMinioWindowsPath]
+    Type[FileMinioPurePath], 
+    Type[FileMinioPath], 
+    Type[PureFileMinioPosixPath], 
+    Type[FileMinioWindowsPath], 
+    Type[FileMinioPosixPath], 
+    Type[PureFileMinioWindowsPath]
 
 ]
 
@@ -49,7 +55,12 @@ _PATHLIKE_CLS: Tuple[FileLike, ...] = (
     FileS3WindowsPath,
     FileS3PosixPath,
     PureFileS3WindowsPath,
-    FileMinioPurePath, FileMinioPath, PureFileMinioPosixPath, FileMinioWindowsPath, FileMinioPosixPath, PureFileMinioWindowsPath
+    FileMinioPurePath, 
+    FileMinioPath, 
+    PureFileMinioPosixPath, 
+    FileMinioWindowsPath, 
+    FileMinioPosixPath, 
+    PureFileMinioWindowsPath
 )
 
 FileSysLike = Union[
@@ -90,7 +101,7 @@ def as_path(path: PathLike) -> FileLike:
         uri_splits = path.split('://', maxsplit=1)
         if len(uri_splits) > 1:    
             # str is URI (e.g. `gs://`, `github://`,...)
-            return _PREFIXES_TO_CLS[uri_splits[0] + '://'](path)
+            return _PREFIXES_TO_CLS[f'{uri_splits[0]}://'](path)
         return FilePath(path)
     elif isinstance(path, _PATHLIKE_CLS):
         return path
@@ -101,8 +112,7 @@ def as_path(path: PathLike) -> FileLike:
 
 def get_userhome(as_pathz: bool = True):
     h = os.path.expanduser('~')
-    if as_pathz: return as_path(h)
-    return h
+    return as_path(h) if as_pathz else h
 
 def get_cwd():
     return os.getcwd()
@@ -122,9 +132,9 @@ def resolve_relative(filepath: PathLike) -> str:
     if '://' in filepath: return filepath
     if filepath.startswith('~'): filepath = filepath.replace('~', get_userhome(), 1)
     elif filepath.startswith('../'): filepath = filepath.replace('..', get_cwd(), 1)
-    elif filepath.startswith('..'): filepath = filepath.replace('..', pathlib.Path(get_cwd()).parent.parent.as_posix() + '/', 1)
+    elif filepath.startswith('..'): filepath = filepath.replace('..', f'{pathlib.Path(get_cwd()).parent.parent.as_posix()}/', 1)
     elif filepath.startswith('./'): filepath = filepath.replace('.', get_cwd(), 1)
-    elif filepath.startswith('.'): filepath = filepath.replace('.', pathlib.Path(get_cwd()).parent.as_posix() + '/', 1)
+    elif filepath.startswith('.'): filepath = filepath.replace('.', f'{pathlib.Path(get_cwd()).parent.as_posix()}/', 1)
     return filepath
 
 def get_path(filepath: PathLike, resolve: bool = False) -> FileLike:
@@ -140,15 +150,11 @@ def get_pathlike(filepath: PathLike, resolve: bool = False) -> FileLike:
 
 to_path = get_path
 
-class File:
-    def __new__(cls, *args, **kwargs) -> FileLike:
-        return get_path(*args, **kwargs)
 
 __all__ = (
     'get_path', 
     'as_path', 
     'PathLike', 
-    'File',
     'FilePath', 
     'FileS3Path', 
     'FileGSPath', 

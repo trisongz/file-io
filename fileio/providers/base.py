@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-
-from ..base_imports import *
-from ..flavours import _pathz_windows_flavour, _pathz_posix_flavour
-
+from fileio.core.imports import *
+from fileio.core.flavours import _pathz_windows_flavour, _pathz_posix_flavour
 from fileio.types import *
-from .methods import _ASYNC_SYNTAX_MAPPING
+
+from fileio.providers.methods import _ASYNC_SYNTAX_MAPPING
 
 if TYPE_CHECKING:
-    from fileio.base import FilePath
+    from fileio.core.base import FilePath
 
 URI_PREFIXES = ('gs://', 's3://', 'minio://', 'mio://', 's3compat://')
 _URI_SCHEMES = frozenset(('gs', 's3', 'minio', 'mio', 's3compat'))
@@ -55,7 +54,7 @@ async def get_cloud_handle(name: Paths, mode: FileMode = 'r', buffering: int = -
 @asynccontextmanager
 async def get_cloud_file(filelike: Paths) -> AsyncContextManager[Handle]:
     file: AsyncFile
-    filelike = cast(IO[Union[str, bytes, os.PathLike]], filelike)
+    filelike = cast(IO[Union[str, bytes, os.PathLike, Any]], filelike)
     file = AsyncFile(filelike)
     yield file
     await file.aclose()

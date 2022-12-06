@@ -7,8 +7,8 @@ import sys
 
 # if 3.10
 if sys.version_info.minor >= 10:
-    from . import _pathlib as pathlib
-    from ._pathlib import Path
+    from fileio.core import _pathlib as pathlib
+    from fileio.core._pathlib import Path
 else:
     import pathlib
     from pathlib import Path

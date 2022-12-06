@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import os
-from loguru import logger
-from .base import *
-from .filesystem_base import Minio_CloudFileSystem
-from .filesystem_pathlib import *
-
+from fileio.utils import logger
+from fileio.providers.base import *
+from fileio.providers.filesys import Minio_CloudFileSystem
+from fileio.providers.filesys_cloud import *
 
 class FileMinioPurePath(CloudFileSystemPurePath):
     _prefix: str = 'minio'

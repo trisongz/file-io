@@ -2,13 +2,18 @@
 import os
 import sys
 #import stat
+import time
+import inspect
 import typing
 import hashlib
+import functools
 
 #from datetime import datetime
 #from urllib.parse import quote
 from email.utils import formatdate
 from mimetypes import guess_type as mimetypes_guess_type
+
+from fileio.utils.logs import default_logger
 
 
 try:
@@ -53,3 +58,33 @@ def get_file_info(path: typing.Union[str, "os.PathLike[str]"]) -> typing.Dict[st
         "media-type": guess_type(path)[0] or "text/plain",
         "filename": os.path.basename(path),
     }
+
+def timer(t: typing.Optional[float] = None, msg: typing.Optional[str] = None, logger = default_logger):
+    if not t: return time.perf_counter()
+    done_time = time.perf_counter() - t
+    if msg: logger.info(f'{msg} in {done_time:.2f} secs')
+    return done_time
+
+def timed(func: typing.Callable):
+    """
+    Decorator to time a function
+    """
+    _func_name = func.__name__
+    @functools.wraps(func)
+    async def fx(*args, **kwargs):
+        start = time.perf_counter()
+        if inspect.iscoroutinefunction(func): result = await func(*args, **kwargs)
+        else: result = func(*args, **kwargs)
+        end = time.perf_counter()
+        default_logger.info(f'{_func_name}: {end - start:.4f} secs')
+        return result
+    return fx
+
+__all__ = [
+    "get_file_info",
+    "md5_hexdigest",
+    "mimetypes_guess_type",
+    "guess_type",
+    'timer',
+    'timed'
+]

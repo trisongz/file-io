@@ -1,21 +1,31 @@
 
 from types import ModuleType
-from typing import Callable, Any, Optional, Coroutine, Type, Union, List, ClassVar
+from typing import Callable, Any, Optional, Coroutine, Type, Union, List, ClassVar, TYPE_CHECKING
 
-try: import gcsfs
-except ImportError: gcsfs: ModuleType = None
+try: 
+    import gcsfs
+except ImportError: 
+    gcsfs: ModuleType = None
 
-try: import s3fs
-except ImportError: s3fs: ModuleType = None
+try: 
+    import s3fs
+except ImportError: 
+    s3fs: ModuleType = None
 
-try: import boto3
-except ImportError: boto3: ModuleType = None
+try: 
+    import boto3
+except ImportError:
+    boto3: ModuleType = None
 
-#try: import botocore
-#except ImportError: botocore: ModuleType = None
+from fileio.utils import LazyLib, settings, logger
+from fileio.core.base import NormalAccessor
+from fileio.providers.base import rewrite_async_syntax, func_as_method_coro
 
-from .base import rewrite_async_syntax, NormalAccessor, func_as_method_coro
-
+if TYPE_CHECKING:
+    try:
+        from fileio.providers.tfio import tfFS
+    except ImportError:
+        tfFS = object
 
 class CloudFileSystemType(type):
     fs: ModuleType = None
@@ -23,117 +33,103 @@ class CloudFileSystemType(type):
     fs_name: str = None # gcsfs
     boto: ModuleType = None
     s3t: Callable = None
+    tffs: 'tfFS' = None
+
     #s3t: 'boto3.s3.transfer.TransferManager' = None
 
     @classmethod
     def is_ready(cls):
         return bool(cls.fsa and cls.fs)
     
-    #@classmethod
+    # @classmethod
     def build_gcsfs(cls, **auth_config):
-        from .._modules import LibModule
-        from .config import CloudConfig
+        gcsfs: ModuleType = LazyLib.import_lib('gcsfs')
+        LazyLib.reload_module(gcsfs)
+        if auth_config: settings.gcp.update_auth(**auth_config)
+        config = settings.gcp.build_gcsfs_config()
+        cls.fs = gcsfs.GCSFileSystem(asynchronous = False, **config)
+        cls.fsa = rewrite_async_syntax(gcsfs.GCSFileSystem(asynchronous=True, **config), 'gs')
 
-        gcsfs: ModuleType = LibModule.import_lib('gcsfs')
-        LibModule.reload_module(gcsfs)
+        if LazyLib.is_available('tensorflow'):
+            from fileio.providers.tfio import tfFS
+            logger.info('Leveraging Tensorflow IO support for GCS')
+            cls.tffs = tfFS
 
-        authz = CloudConfig()
-        if auth_config: authz.update_auth(**auth_config)
-        _config = {}
-        if authz.google_application_credentials.exists: _config['token'] = authz.google_application_credentials.as_posix()
-        gcp_project = authz.get_gcp_project()
-        if gcp_project: _config['project'] = gcp_project
-        if authz.gcs_client_config: _config['client_kwargs'] = authz.gcs_client_config
-        if authz.gcs_config: _config['config_kwargs'] = authz.gcs_config
-        cls.fs = gcsfs.GCSFileSystem(asynchronous=False, **_config)
-        cls.fsa = rewrite_async_syntax(gcsfs.GCSFileSystem(asynchronous=True, **_config), 'gs')
     
-    #@classmethod
+    # @classmethod
     def build_s3fs(cls, **auth_config):
-        from .._modules import LibModule
-        from .config import CloudConfig
 
-        s3fs = LibModule.import_lib('s3fs')
-        LibModule.reload_module(s3fs)
+        s3fs = LazyLib.import_lib('s3fs')
+        LazyLib.reload_module(s3fs)
         
-        boto3 = LibModule.import_lib('boto3')
-        LibModule.reload_module(boto3)
+        boto3 = LazyLib.import_lib('boto3')
+        LazyLib.reload_module(boto3)
 
-        authz = CloudConfig()
-        if auth_config: authz.update_auth(**auth_config)
-        _config = {}
-        if authz.aws_access_key_id:
-            _config['key'] = authz.aws_access_key_id
-            _config['secret'] = authz.aws_secret_access_key
-        elif authz.aws_access_token: _config['token'] = authz.aws_access_token
-        elif not authz.boto_config: _config['anon'] = True
-        if authz.s3_config: _config['config_kwargs'] = authz.s3_config
-        cls.fs = s3fs.S3FileSystem(asynchronous=False, **_config)
-        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **_config))
+        if auth_config: settings.aws.update_auth(**auth_config)
+        config = settings.aws.build_s3fs_config()
+        cls.fs = s3fs.S3FileSystem(asynchronous = False, **config)
+        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+
         
         from botocore.config import Config as BotoConfig
         import boto3.s3.transfer as s3transfer
-        boto_config = BotoConfig(max_pool_connections = authz.max_workers)
-        cls.boto = boto3.client('s3', region_name = authz.aws_region, config = boto_config)
+        boto_config = BotoConfig(max_pool_connections = settings.core.num_workers * 2)
+        cls.boto = boto3.client('s3', region_name = settings.aws.aws_region, config = boto_config)
         transfer_config = s3transfer.TransferConfig(
             use_threads = True,
-            max_concurrency = authz.max_workers,
+            max_concurrency = settings.core.num_workers,
         )
         def create_s3t(self):
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
-        #cls.s3t = lambda: s3transfer.create_transfer_manager(cls.boto, transfer_config)
+        
         cls.s3t = create_s3t
-        #cls.s3t = s3transfer.create_transfer_manager(cls.boto, transfer_config)
+
     
-    #classmethod
+    # @classmethod
     def build_minio(cls, **auth_config):
-        from .._modules import LibModule
-        from .config import CloudConfig
+        s3fs: ModuleType = LazyLib.import_lib('s3fs')
+        LazyLib.reload_module(s3fs)
 
-        s3fs: ModuleType = LibModule.import_lib('s3fs')
-        LibModule.reload_module(s3fs)
+        boto3 = LazyLib.import_lib('boto3')
+        LazyLib.reload_module(boto3)
 
-        boto3 = LibModule.import_lib('boto3')
-        LibModule.reload_module(boto3)
+        if auth_config: settings.minio.update_auth(**auth_config)
+        config = settings.minio.build_s3fs_config()
         
-        authz = CloudConfig()
-        if auth_config: authz.update_auth(**auth_config)
-        _config = {}        
-        
-        if authz.minio_secret_key:
-            _config['key'] = authz.minio_access_key
-            _config['secret'] = authz.minio_secret_key
-        elif authz.minio_access_token: _config['token'] = authz.minio_access_token
-        _config['client_kwargs'] = {'endpoint_url': authz.minio_endpoint, 'region_name': authz.aws_region}
-        _config['config_kwargs'] = authz.minio_config or {}
-        _config['config_kwargs']['signature_version'] = authz.minio_signature_ver
-        cls.fs = s3fs.S3FileSystem(asynchronous=False, **_config)
-        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **_config))
+        cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
+        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
         
         import boto3.s3.transfer as s3transfer
         from botocore.config import Config as BotoConfig
         
         boto_config = BotoConfig(
-            signature_version = authz.minio_signature_ver,
-            max_pool_connections = authz.max_workers
+            signature_version = settings.minio.minio_signature_ver,
+            max_pool_connections = settings.core.max_workers * 2
         )
-        cls.boto = boto3.client('s3', region_name = authz.aws_region, endpoint_url = authz.minio_endpoint, aws_access_key_id = authz.minio_access_key, aws_secret_access_key = authz.minio_secret_key, config = boto_config)
+        cls.boto = boto3.client(
+            's3', 
+            region_name = settings.minio.minio_region, 
+            endpoint_url = settings.minio.minio_endpoint, 
+            aws_access_key_id = settings.minio.minio_access_key, 
+            aws_secret_access_key = settings.minio.minio_secret_key, 
+            config = boto_config
+        )
         transfer_config = s3transfer.TransferConfig(
             use_threads = True,
-            max_concurrency = authz.max_workers,
+            max_concurrency = settings.core.max_workers
         )
         def create_s3t(self):
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
         
         cls.s3t = create_s3t
-        #cls.s3t = s3transfer.create_transfer_manager(cls.boto, transfer_config)
 
-    #@classmethod
+    # @classmethod
     def build_filesystems(cls, force: bool = False, **auth_config):
         """
         Lazily inits the filesystems
         """
-        if cls.fs and cls.fsa and not force: return
+        if cls.fs is not None and cls.fsa is not None and not force: 
+            return
         if cls.fs_name == 's3fs':
             cls.build_s3fs(**auth_config)
         elif cls.fs_name == 'minio':
@@ -245,6 +241,7 @@ class BaseAccessor(NormalAccessor):
 
     boto: ClassVar = CloudFileSystem.boto
     s3t: Callable = CloudFileSystem.s3t
+    tffs: 'tfFS' = CloudFileSystem.tffs
     
     # Async Methods
     async_stat: Callable = create_async_coro(CloudFileSystem, 'stat')
@@ -339,6 +336,8 @@ class BaseAccessor(NormalAccessor):
         cls.async_filesys = cls.CloudFileSystem.fsa
         cls.boto = cls.CloudFileSystem.boto
         cls.s3t = cls.CloudFileSystem.s3t
+        cls.tffs = cls.CloudFileSystem.tffs
+
         
         # Async Methods
         cls.async_stat: Callable = create_async_coro(cls.CloudFileSystem, 'stat')
@@ -359,14 +358,14 @@ class BaseAccessor(NormalAccessor):
         cls.async_glob: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_glob')
         cls.async_find: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_find')
         
-        cls.async_cat: Callable = create_async_coro(cls.CloudFileSystem, 'async_cat')
-        cls.async_cat_file: Callable = create_async_coro(cls.CloudFileSystem, 'async_cat_file')
+        cls.async_cat: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_cat')
+        cls.async_cat_file: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_cat_file')
         
         cls.async_pipe: Callable = create_async_coro(cls.CloudFileSystem, 'async_pipe')
         cls.async_pipe_file: Callable = create_async_coro(cls.CloudFileSystem, 'async_pipe_file')
         
         cls.async_is_dir: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_isdir')
-        cls.async_is_file: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_is_file')
+        cls.async_is_file: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_isfile')
         cls.async_copy: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_copy')
         cls.async_copy_file: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_cp_file')
         cls.async_get: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_get')
@@ -390,6 +389,7 @@ class GCP_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 'gcsfs.GCSFileSystem' = None
     fsa: 'gcsfs.GCSFileSystem' = None
     fs_name: str = 'gcsfs'
+    tffs: 'tfFS' = None # Tensorflow IO
 
 class AWS_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 's3fs.S3FileSystem' = None

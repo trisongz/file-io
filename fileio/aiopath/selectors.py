@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import functools
-
-from os import DirEntry
 from typing import AsyncIterable, Callable, List, TYPE_CHECKING
 
-from .._pathlib import Path, PosixPath, WindowsPath, _NormalAccessor, _Selector,_is_wildcard_pattern, _ignore_error, _Flavour
-
-#from pathlib import Path, PosixPath, WindowsPath, _NormalAccessor, _Selector,_is_wildcard_pattern, _ignore_error, _Flavour
-
-from .wrap import CoroutineMethod
+from fileio.core._pathlib import _is_wildcard_pattern, _ignore_error, _Flavour
+from fileio.aiopath.wrap import CoroutineMethod
 
 if TYPE_CHECKING:  # keep mypy quiet
-  from ..base import FilePath
+  from fileio.core.base import FilePath
 
 class _AsyncSelector:
     """A selector matches a specific glob pattern part against the children

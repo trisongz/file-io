@@ -3,22 +3,22 @@ Source: https://raw.githubusercontent.com/python/cpython/3.9/Lib/pathlib.py
 
 From python3.9 @ master
 """
-
-import fnmatch
-import functools
-import io
-import ntpath
 import os
-import posixpath
+import io
 import re
 import sys
+import fnmatch
+import functools
+import ntpath
+import posixpath
+
 from _collections_abc import Sequence
 from errno import EINVAL, ENOENT, ENOTDIR, EBADF, ELOOP
 from operator import attrgetter
 from stat import S_ISDIR, S_ISLNK, S_ISREG, S_ISSOCK, S_ISBLK, S_ISCHR, S_ISFIFO
 from urllib.parse import quote_from_bytes as urlquote_from_bytes
 
-from .utils import get_file_info
+from fileio.utils.helpers import get_file_info
 
 supports_symlinks = True
 if os.name == 'nt':
@@ -33,9 +33,13 @@ else:
 
 
 __all__ = [
-    "PurePath", "PurePosixPath", "PureWindowsPath",
-    "Path", "PosixPath", "WindowsPath",
-    ]
+    "PurePath", 
+    "PurePosixPath", 
+    "PureWindowsPath",
+    "Path", 
+    "PosixPath", 
+    "WindowsPath",
+]
 
 #
 # Internals

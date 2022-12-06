@@ -3,9 +3,9 @@ Handles Importing the correct pathlib for this library in
 python3.10 cases
 """
 
-import sys
 import os
 import io
+import sys
 import inspect
 import ntpath
 import posixpath
@@ -16,20 +16,21 @@ from contextlib import asynccontextmanager
 
 from typing import TYPE_CHECKING, Union
 from typing import Optional, List, AsyncIterable, Iterable, IO, AsyncContextManager, cast, Callable
-from .aiopath.wrap import coro_as_method_coro, func_as_method_coro, to_thread, method_as_method_coro, func_to_async_func
-from .aiopath.handle import IterableAIOFile, get_handle
-from .aiopath.types import Final, Literal, FileMode
+from fileio.types import Final, Literal, FileMode
+
+from fileio.aiopath.wrap import coro_as_method_coro, func_as_method_coro, to_thread, method_as_method_coro, func_to_async_func
+from fileio.aiopath.handle import IterableAIOFile, get_handle
 
 
 # if 3.10
 if sys.version_info.minor >= 10:
-    from . import _pathlib as pathlib
-    from ._pathlib import PosixPath, WindowsPath, Path, PurePath, _ignore_error
-    from ._pathlib import _NormalAccessor as NormalAccessor
-    from ._pathlib import _make_selector as _sync_make_selector
-    from ._pathlib import _PosixFlavour, _WindowsFlavour
+    from fileio.core import _pathlib as pathlib
+    from fileio.core._pathlib import PosixPath, WindowsPath, Path, PurePath, _ignore_error
+    from fileio.core._pathlib import _NormalAccessor as NormalAccessor
+    from fileio.core._pathlib import _make_selector as _sync_make_selector
+    from fileio.core._pathlib import _PosixFlavour, _WindowsFlavour
     try:
-        from ._pathlib import _getfinalpathname
+        from fileio.core._pathlib import _getfinalpathname
         _async_getfinalpathname = func_to_async_func(_getfinalpathname)
 
     except ImportError:
@@ -76,8 +77,7 @@ Handle = AsyncFile
 
 def iscoroutinefunction(obj):
     if inspect.iscoroutinefunction(obj): return True
-    if hasattr(obj, '__call__') and inspect.iscoroutinefunction(obj.__call__): return True
-    return False
+    return bool(hasattr(obj, '__call__') and inspect.iscoroutinefunction(obj.__call__))
 
 
 __all__ = (

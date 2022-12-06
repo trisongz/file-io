@@ -5,7 +5,7 @@ import os
 from errno import EINVAL
 from typing import Optional, Callable, Awaitable, Dict, List, TYPE_CHECKING
 
-from .base_imports import _PosixFlavour, _WindowsFlavour, _getfinalpathname, _async_getfinalpathname, func_to_async_func
+from fileio.core.imports import _PosixFlavour, _WindowsFlavour, _getfinalpathname, _async_getfinalpathname, func_to_async_func
 
 if TYPE_CHECKING:  # keep mypy quiet
     from .base import FilePath, _FileAccessor

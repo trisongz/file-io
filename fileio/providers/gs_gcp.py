@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import os
-from .base import *
-from .filesystem_base import GCP_CloudFileSystem
-from .filesystem_pathlib import *
-
+from fileio.providers.base import *
+from fileio.providers.filesys import GCP_CloudFileSystem
+from fileio.providers.filesys_cloud import *
+from fileio.utils import logger
 
 class FileGSPurePath(CloudFileSystemPurePath):
     _prefix: str = 'gs'
@@ -53,6 +53,7 @@ class FileGSPath(CloudFileSystemPath):
         self._accessor: AccessorLike = get_accessor(self._prefix)
         self._closed = False
         self._fileio = None
+        self._has_tffs = self._accessor.tffs is not None
 
     def __new__(cls, *parts, **kwargs):
         if cls is FileGSPath or issubclass(cls, FileGSPath): 
@@ -65,6 +66,108 @@ class FileGSPath(CloudFileSystemPath):
 
         self._init()
         return self
+    
+    def gfile(self, mode: str = 'r', **kwargs: Any):
+        return self._accessor.tffs.GFile(self.string, mode = mode, **kwargs) if self._has_tffs else self.open(mode = mode, **kwargs)
+
+    def glob(self, pattern: str = '*', as_path: bool = True) -> Iterable[Union[str, Type['CloudFileSystemPath']]]:
+        """Iterate over this subtree and yield all existing files (of any
+        kind, including directories) matching the given relative pattern.
+        Warning: doesn't work as expected. Use Find Instead.
+        """
+        if not pattern: raise ValueError("Unacceptable pattern: {!r}".format(pattern))
+        #if self.is_cloud:
+        if self._has_tffs:
+            glob_pattern = self.joinpath(pattern).string
+            # logger.info(f'Using TFFS for globbing: {glob_pattern}')
+            matches = self._accessor.tffs.glob(pattern = glob_pattern)
+            if not matches: return matches
+            if as_path: matches = [type(self)(m) for m in matches]
+            return matches
+        return super().glob(pattern = pattern, as_path = as_path)
+
+    async def async_glob(self, pattern: str = '*', as_path: bool = True) -> AsyncIterable[Type['CloudFileSystemPath']]:
+        """Iterate over this subtree and yield all existing files (of any
+        kind, including directories) matching the given relative pattern.
+        """
+        if not pattern: raise ValueError("Unacceptable pattern: {!r}".format(pattern))
+        if self._has_tffs:
+            glob_pattern = self.joinpath(pattern).string
+            # logger.info(f'Using TFFS for globbing: {glob_pattern}')
+            matches = await self._accessor.tffs.async_glob(pattern = glob_pattern)
+            if not matches: return matches
+            if as_path: matches = [type(self)(m) for m in matches]
+            return matches
+        
+        return await super().async_glob(pattern = pattern, as_path = as_path)
+
+    def read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS) -> str:
+        """Read the contents of this file as a string.
+        """
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'r') as file:
+                return file.read()
+        return super().read_text(encoding=encoding, errors=errors)
+
+    async def async_read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS) -> str:
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'r') as file:
+                return await file.async_read()
+        return await super().async_read_text(encoding=encoding, errors=errors)
+
+    def write_text(self, data: str, encoding: Optional[str] = DEFAULT_ENCODING, errors: Optional[str] = ON_ERRORS, newline: Optional[str] = NEWLINE) -> int:
+        """
+        Open the file in text mode, write to it, and close the file.
+        """
+        if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'w') as file:
+                return file.write(data)
+        return super().write_text(data, encoding=encoding, errors=errors, newline=newline)
+
+    async def async_write_text(self, data: str, encoding: Optional[str] = DEFAULT_ENCODING, errors: Optional[str] = ON_ERRORS, newline: Optional[str] = NEWLINE) -> int:
+        """
+        Open the file in text mode, write to it, and close the file.
+        """
+        if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'w') as file:
+                return await file.async_write(data)
+        return await super().async_write_text(data, encoding=encoding, errors=errors, newline=newline)
+
+    def read_bytes(self) -> bytes:
+        """Read the contents of this file as bytes.
+        """
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'rb') as file:
+                return file.read()
+        return super().read_bytes()
+
+    async def async_read_bytes(self) -> bytes:
+        """Read the contents of this file as bytes."""
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'rb') as file:
+                return await file.async_read()
+        return await super().async_read_bytes()
+
+    def write_bytes(self, data: bytes) -> int:
+        """
+        Open the file in bytes mode, write to it, and close the file.
+        """
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'wb') as file:
+                return file.write(data)
+        return super().write_bytes(data)
+
+    async def async_write_bytes(self, data: bytes) -> int:
+        """
+        Open the file in bytes mode, write to it, and close the file.
+        """
+        if self._has_tffs:
+            with self._accessor.tffs.GFile(self.string, 'wb') as file:
+                return await file.async_write(data)
+        return await super().async_write_bytes(data)
+
 
 
 class FileGSPosixPath(PosixPath, FileGSPath, PureFileGSPosixPath):
