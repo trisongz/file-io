@@ -1,235 +1,295 @@
 # file_io
- Deterministic File Lib to make working with Files across Object Storage easier
+
+ Drop in replacement for `pathlib.Path` with support for Cloud Object Storage with async compatability. 
+
+ Supports: 
+ - `gs://` - Google Cloud Storage
+ - `s3://` - Amazon S3
+ - `file://` - Local Filesystem
+ - `minio://` - Minio Object Storage
 
 ## Quickstart
 
-```python
-!pip install --upgrade git+https://github.com/trisongz/file-io.git
-!pip install --upgrade file-io
+### Installation
 
+```bash
+
+# From Source
+pip install --upgrade git+https://github.com/trisongz/file-io.git
+# Stable
+pip install --upgrade file-io
+
+```
+
+### Quick Usage
+
+```python
 
 from fileio import File
 
-pathlike = File('gs://path/to/item.txt')
-pathlike = File('s3://path/to/item.txt')
+s3_bucket = 's3://my-bucket
+gcs_bucket = 'gs://my-bucket'
+
+# The File class automatically routes the path to the correct filesystem
+s3_path = File(s3_bucket)
+gcs_path = File(gcs_bucket)
+
+file_name = 'test.txt'
+file_data = 'hello world'
+
+# Use joinpath to create a new file path just like pathlib.Path
+# It will also ensure the path is valid for the given filesystem
+
+s3_file_path = s3_path.joinpath(file_name)
+gcs_file_path = gcs_path.joinpath(file_name)
+
+# Show posix path
+print('S3 File: ', s3_file_path.as_posix())
+print('GCS File: ', gcs_file_path.as_posix())
+
+# Write to the file
+s3_file_path.write_text(file_data)
+gcs_file_path.write_text(file_data)
+
+# Write Bytes/Binary
+# s3_file_path.write_bytes(file_data)
+# gcs_file_path.write_bytes(file_data)
+
+# Get File Info
+print(s3_file_path.info())
+print(gcs_file_path.info())
+
+# Read from the file
+print(s3_file_path.read_text())
+print(gcs_file_path.read_text())
+
+# Read Bytes/Binary
+# print(s3_file_path.read_bytes())
+# print(gcs_file_path.read_bytes())
+
+# Validate the file exists
+print(s3_file_path.exists())
+print(gcs_file_path.exists())
+
+# Delete the file
+s3_file_path.unlink()
+# s3_file_path.rm_file()
+# s3_file_path.rm()
+
+gcs_file_path.unlink()
+# gcs_file_path.rm_file()
+# gcs_file_path.rm()
+
+# Use as standard open method
+with s3_file_path.open('w') as f:
+    f.write(file_data)
+
+with gcs_file_path.open('w') as f:
+    f.write(file_data)
+
+# Search with glob
+print(s3_path.glob('*.txt'))
+print(gcs_path.glob('*.txt'))
+
+```
+
+
+### Async Usage
+
+Additional Async capaibilities are available with most methods using `async_` prefix. This will allow you to use the async context manager and async file methods.
+
+```python
+
+import asyncio
+from fileio import File
+
+
+s3_bucket = 's3://my-bucket
+gcs_bucket = 'gs://my-bucket'
+
+s3_path = File(s3_bucket)
+gcs_path = File(gcs_bucket)
+
+file_name = 'test.txt'
+file_data = 'hello world'
+
+# Use joinpath to create a new file path just like pathlib.Path
+# It will also ensure the path is valid for the given filesystem
+
+s3_file_path = s3_path.joinpath(file_name)
+gcs_file_path = gcs_path.joinpath(file_name)
+
+print('S3 File: ', s3_file_path.as_posix())
+print('GCS File: ', gcs_file_path.as_posix())
+
+async def run_tests():
+    # All methods shown above are also available as async methods
+
+    # Write to the file
+    await s3_file_path.async_write_text(file_data)
+    await gcs_file_path.async_write_text(file_data)
+
+    # Write Bytes/Binary
+    # await s3_file_path.async_write_bytes(file_data)
+    # await gcs_file_path.async_write_bytes(file_data)
+
+    # Read from the file
+    print(await s3_file_path.async_read_text())
+    print(await gcs_file_path.async_read_text())
+
+    # Read Bytes/Binary
+    # print(await s3_file_path.async_read_bytes())
+    # print(await gcs_file_path.async_read_bytes())
+
+    # Validate the file exists
+    print(await s3_file_path.async_exists())
+    print(await gcs_file_path.async_exists())
+
+    # Delete the file
+    await s3_file_path.async_unlink()
+    # await s3_file_path.async_rm_file()
+    # await s3_file_path.async_rm()
+
+    await gcs_file_path.async_unlink()
+    # await gcs_file_path.async_rm_file()
+    # await gcs_file_path.async_rm()
+
+    # With async, you need to use the async context manager
+    async with s3_file_path.async_open('w') as f:
+        # note that the `write` method requires `await`
+        await f.write(file_data)
+
+    async with gcs_file_path.async_open('w') as f:
+        await f.write(file_data)
+    
+    # Search with glob
+    print(await s3_path.async_glob('*.txt'))
+    print(await gcs_path.async_glob('*.txt'))
+    
+
+
+asyncio.run(run_tests())
+
+```
+
+### Configuration
+
+The configuration for cloud providers are picked up automatically, however if you need to configure them, you can do so using the `settings` and set them explicitly.
+
+```python
+
+from fileio import File, settings
+
+# Configure S3
+settings.aws.update_auth(
+    aws_access_token = 'my-access-token',
+    aws_access_key_id = 'my-access-key-id',
+    aws_secret_access_key = 'my-secret-access-key',
+    aws_region = "us-east-1"
+    set_s3_endpoint = True
+)
+
+# Configure GCS
+settings.gcp.update_auth(
+    gcp_project = 'my-project',
+    google_application_credentials = 'my-credentials.json'
+)
+
+# Configure Multiple
+# Auths and reset the underlying filesystems
+# to use the new auths.
+
+settings.update_auth(
+    gcp = {
+        'gcp_project': 'my-project',
+        'google_application_credentials': 'my-credentials.json'
+    },
+    aws = {
+        'aws_access_key_id': 'my-access'
+    },
+    minio = {
+        'minio_endpoint': 'https://my-endpoint',
+    }
+)
 
 
 ```
 
-### Changelogs
+### Useful Tips and Tricks
 
+Below are a few snippets of code that may be useful for common tasks.
 
----
-May 21, 2022 v0.3.1
-
-- Complete Overhaul and refactor.
-
-
----
-Aug 31, 2021 v0.3.0alpha
-
-- Major refactor to remove `tensorflow` as primary dependency
-- Started secondary support of `gs` using `google-cloud-storage`
-- Started primary support of `s3` using `tensorflow`
-- Working on secondary support of `s3` using `aioaws`
-- Planning to integrate `async` support
-- Planning to add deeper integration with `smart_open`
-- Planning to add support for `supabase` storage
-- Started adding auto-auth support: `s3`, `gs`, `supabase`
-- Added `compat` module for previous `File` API to prevent breakage
-    - All previous `File` APIs are still usable.
-    - Does not check for `tensorflow` dependency. So using without `tensorflow` will break
-
----
-Aug 3, 2021 - v0.1.16
-- A lot. But its pretty lazily done.
----
-July 7, 2021 - v0.1.15
-- Modified behavior of `open` and direct `__call__`
-- Remove Explicit need for Tensorflow in setup, but still require it at the moment.
-    - This may help with macos Tensorflow installations using `tensorflow-macos`
----
-July 2, 2021 - v0.1.13
-- Change `.textread` to return string rather than list
-    - `.textreadlines` replaces original function
-- Update `.textlist` to support option for stripping newlines and have replacements
-    - `strip_newlines = True`, will strip all newlines prior to return
-    - `replacements: [ list | dict | str ] = None`, will iterate through and replace
-- Update `.base(filename, with_ext=True)` to allow return without File Extension
-- Add `.readfile` method to return `.read()` API
-- Add `.mod_fname(filename, new_name=None, prefix=None, suffix=None, ext=None, directory=None, create_dirs=True, filename_only=False, space_replace='_')`
-    - `src = 'gs://mybucket/path/file.txt'`
-    - `res = File.mod_fname(src, newname='newfile', ext='json', directory='/newdir', prefix='test_', suffix='_001')`
-    - `>> res = /newdir/test_newfile_001.json`
-
----
-June 30, 2021 - v0.1.11
-- Added Dill as default pickler if installed
-- Ability to set any pickle method that supports .dumps/.loads call with `File.set_pickler(name='pickler')` or `File.set_pickler(function=cloudpickle)`
-- Hotfix to change method to dumps/loads
-- Hotfix for .gsutil method which did not initialize properly.
----
-June 11, 2021 - v0.1.8
-- Hotfix for methods .split_file/.split_files
----
-June 9, 2021 - v0.1.7
-- Hotfix for Method .get_local
-- Hotfix for method .jlgs
----
-May 28, 2021 - v0.1.6
-- Added Method to get User Dir
-    - File.userdir
----
-May 21, 2021 - v0.1.5
-- Added TSV/CSV Write Methods
-    - File.csvwrite
-    - File.tsvwrite
----
-May 20, 2021 - v0.1.4
-- Hotfix for file.split_file(s) method to also return resulting filenames with `output_files` key
----
-May 20, 2021 - v0.1.3
-- Py Version Requirement Fix
----
-May 19, 2021 - v0.1.2
-- Minor Fixes
-- Added Methods for Splitting Files/Items
-    - File.calc_splits
-    - File.split_items
-    - File.split_file
-    - File.split_files
----
-May 12, 2021 - v0.1.1
-- Minor Fixes
-- Added Method
-    - File.fmv
----
-May 12, 2021 - v0.1.0
-- Refactored Library
-- Organized Methods
-- Added MultiThreaded Wrapper
-    - `from fileio import MultiThreadPipeline`
-- Added gsutil wrapper method
-    - File.gsutil
-- Added Methods for Yaml
-    - File.yload
-    - File.yloads
-    - File.ydump
-    - File.ydumps
-    - File.yparse
-- Updated Methods for Json
-    - File.jsonload
-    - File.jsonloads
-    - File.jsondump
-    - File.jsondumps
-    - File.jp
-    - File.jwrite
-    - File.jg
-    - File.jgs
-- Updated Methods for Jsonlines 
-    - File.jll
-    - File.jlp
-    - File.jldumps
-    - File.jlwrite
-    - File.jlwrites
-    - File.jlg
-    - File.jlgs
-    - File.jlload
-    - File.jlw
-    - File.jlsample
-- Updated Methods for Text
-    - File.textload
-    - File.textwrite
-    - File.textread
-    - File.textlist
-- Added Methods for Requests
-    - File.rget
-    - File.rpost
-    - File.reqsess
-- Added Methods for URL Encoding/Decoding
-    - File.urlencode
-    - File.urldecode
-- Added Methods for Hashing
-    - File.hash
-    - File.checkhash
-- Added Methods to Disable/Enable TQDM
-    - File.enable_progress
-    - File.disable_progress
-- Added Utility Methods
-    - File.cat
-    - File.backup
-    - File.findir
-    - File.append_ext
-    - File.copydir
-    - File.dirglob
-    - File.absdir
-    - File.get_local
-    - File.finalize
-    - File.print
-    - File.set_printer
-- Fixed/Updated Methods
-    - File.isfile
-    - File.download
-    - File.batch_download
-    - File.pexists
-    - File.whichpath
-    - File.copy
-    - File.bcopy
-- Added TFDSIODataset
-
----
-## Previous Version
----
 ```python
 from fileio import File
 
-'''
-Recognized File Extensions
+## Easily copy async files
+async def clone_file(src, dst):
+    # Ensure they are both `FileType` objects
+    # This will read the file from the src and write it to the dst
+    # in binary mode, so it can clone `s3` <> `gcs` files
+    src, dst = File(src), File(dst)
+    await dst.async_write_bytes(await src.async_read_bytes())
+    return dst
 
-.json               - json
-.jsonl/.jsonlines   - jsonlines
-.csv                - csv
-.tsv                - tsv with "\t" seperator
-.txt                - txtlines
-.pkl                - pickle
-.pt                 - pytorch
-.tfrecords          - tensorflow
-'''
+async def file_checksum(src):
+    # Ensure it is a `FileType` object
+    src = File(src)
+    # Read the file in chunks and calculate the checksum
+    # This is useful for large files
+    # can use any standard hashlib method
+    return await src.async_get_checksum(
+        method = 'md5'
+        chunk_size = 1024 * 4
+    )
 
-# Main auto classes
-File.open(filename, mode='r', auto=True, device=None) # device is specific to pytorch. Set auto=False to get a barebones Posix via Gfile
-File.save(data, filename, overwrite=False) # if not overwrite, will attempt to append for newline files
-File.load(filenames, device=None) # yields generators per file, meaning you can have different file types
-File.download(url, dirpath=None, filename=None, overwrite=False) # Downloads a single url
-File.gdown(url, extract=True, verbose=False) # uses gdown lib to grab a google drive drive
+async def copy_uploaded_file(src: 'UploadFile'):
+    # Useful for copying files uploaded via FastAPI / Starlette
+    # since they are often `SpooledTemporaryFile` objects
+    # which means for tasks such as checksuming before
+    # doing any processing, you need to copy the file
+    # otherwise it will be removed from memory. 
 
-# Main i/o classes (Not Binary)
-File.read(filename) # 'r'
-File.write(filename) # 'w'
-File.append(filename) # 'a'
+    # Remember to remove the file after it is done
+    dst = File.get_tempfile(
+        delete = False
+    )
+    # Copy the file
+    await dst.async_write_bytes(await src.read())
+    return dst 
 
-# Binary
-File.wb(filename) # 'wb'
-File.rb(filename) # 'rb'
-
-
-# Batch downloaders
-File.batch_download(urls, directory=None, overwrite=False) # downloads all urls into a directory, skipping if overwrite = True and exists
-File.batch_gdown(urls, directory=None, extract=True, verbose=False) # downloads all gdrive urls to a directory
-
-# Extension Specific 
-
-# .json
-File.jsonload(filename)
-File.jsondump(dict, filename)
-
-# .jsonl/.jsonlines (Single File)
-File.jlg(filename)
-File.jlw(data, filename, mode='auto', verbose=True)
-
-# Multifile Readers
-
-# .jsonl/.jsonlines
-File.jgs(filenames)
 
 ```
+
+
+### Dependencies
+
+The aim of this library is to be as lightweight as possible. It is built on top of the following libraries, and leverages lazyloading of dependencies to avoid unnecessary imports:
+
+- [fsspec](https://github.com/fsspec/fsspec) - For Filesystem Support
+
+- [s3fs](https://github.com/fsspec/s3fs) - For S3 Support
+
+- [gcsfs](https://github.com/fsspec/gcsfs) - For GCS Support
+
+    - [tensorflow](https://github.com/tensorflow/tensorflow) - Additional GCS Support but only if already available. Leverages tf's better C++ bindings for GCS.
+
+- [loguru](https://github.com/Delgan/loguru) - Logging
+
+- [pydantic](https://github.com/pydantic/pydantic) - Type Support and Configuration
+
+- [dill](https://github.com/uqfoundation/dill) - Serialization Support
+
+- [aiofile](http://github.com/mosquito/aiofile) - Async File Support
+
+- [anyio](https://github.com/agronholm/anyio) - Async Support
+
+
+### [Changelogs](changelogs.txt)
+
+**v0.4.1**
+
+- Modified and validated `settings` to enable multiple auths and reset the underlying filesystems to use the new auths.
+
+- Update readme with better examples and documentation.
+
+

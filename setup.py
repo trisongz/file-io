@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 if sys.version_info.major != 3:
     raise RuntimeError("This package requires Python 3+")
 
-version = '0.4.0'
+version = '0.4.1'
 pkg_name = 'file-io'
 gitrepo = 'trisongz/file-io'
 root = Path(__file__).parent
@@ -23,10 +23,9 @@ requirements = [
 extras = {
     'gcs': ['gcsfs'],
     's3': ['s3fs'],
-    # 's3': ['s3fs', 'boto3'], 
-    #'s3': ['s3fs', 'aiobotocore[awscli]'], 
     'cloud': ['gcsfs', 's3fs'],
 }
+
 # pip install fileio[cloud]
 
 args = {

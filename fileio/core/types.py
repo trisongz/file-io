@@ -1,6 +1,7 @@
 ## Put things together to create types 
 import inspect
 import pathlib
+import tempfile
 
 from enum import Enum
 from fileio.core.generic import get_path, FileLike
@@ -76,6 +77,21 @@ class File:
         _file = get_filelike(*args, **kwargs)
         if load_file: return cls.load_file(file = _file, mode = mode, loader = loader)
         return _file
+
+    @classmethod
+    def get_tempfile(
+        cls,
+        *args,
+        delete: bool = False,
+        **kwargs
+    ):
+        """
+        Creates a new temporary file
+        """
+        f = tempfile.NamedTemporaryFile(*args, delete = delete, **kwargs)
+        f.close()
+        return get_path(f.name)
+
 
     @classmethod
     async def async_load_json(

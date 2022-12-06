@@ -54,7 +54,15 @@ class CoreSettings(BaseSettings):
         if self.boto_config_exists:
             os.environ["BOTO_CONFIG"] = self.boto_config_path.as_posix()
             os.environ["BOTO_PATH"] = self.boto_config_path.as_posix()
-        
+    
+    def update_config(self, **kwargs):
+        for k, v in kwargs.items():
+            if not hasattr(self, k):  continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
+
 
 core_settings = CoreSettings()
 
@@ -80,30 +88,33 @@ class AwsSettings(BaseSettings):
     
     def set_env(self):
         if self.aws_access_key_id:
-            os.system['AWS_ACCESS_KEY_ID'] = self.aws_access_key_id
+            os.environ['AWS_ACCESS_KEY_ID'] = self.aws_access_key_id
         if self.aws_secret_access_key:
-            os.system['AWS_SECRET_ACCESS_KEY'] = self.aws_secret_access_key
+            os.environ['AWS_SECRET_ACCESS_KEY'] = self.aws_secret_access_key
         if self.aws_region:
-            os.system['AWS_REGION'] = self.aws_region
+            os.environ['AWS_REGION'] = self.aws_region
         if self.aws_access_token:
-            os.system['AWS_ACCESS_TOKEN'] = self.aws_access_token
+            os.environ['AWS_ACCESS_TOKEN'] = self.aws_access_token
         if self.set_s3_endpoint:
-            os.system['S3_ENDPOINT'] = self.s3_endpoint
+            os.environ['S3_ENDPOINT'] = self.s3_endpoint
     
 
     def update_config(self, **kwargs):
         for k, v in kwargs.items():
-            if isinstance(v, dict) and hasattr(self, k):
-                s = getattr(self, k)
-                for k2, v2 in v.items():
-                    if hasattr(s, k2):
-                        setattr(s, k2, v2)
-            elif not hasattr(self, k): continue
-            else: setattr(self, k, v)
+            if not hasattr(self, k):  continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
 
-    def update_auth(self, **config):
+    def update_auth(self, update_fs: bool = True, **config):
         self.update_config(**config)
         self.set_env()
+
+        if update_fs:
+            # Reset the accessor to use the new settings
+            from fileio.providers.filesys import get_accessor
+            get_accessor('s3', _reset=True)
 
     def build_s3fs_config(self) -> Dict[str, Any]:
         """
@@ -179,17 +190,21 @@ class GcpSettings(BaseSettings):
 
     def update_config(self, **kwargs):
         for k, v in kwargs.items():
-            if isinstance(v, dict) and hasattr(self, k):
-                s = getattr(self, k)
-                for k2, v2 in v.items():
-                    if hasattr(s, k2):
-                        setattr(s, k2, v2)
-            elif not hasattr(self, k): continue
-            else: setattr(self, k, v)
+            if not hasattr(self, k):  continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
 
-    def update_auth(self, **config):
+    def update_auth(self, update_fs: bool = True, **config):
         self.update_config(**config)
         self.set_env()
+
+        if update_fs:
+            # Reset the accessor to use the new settings
+            from fileio.providers.filesys import get_accessor
+            get_accessor('gs', _reset=True)
+
     
 
 class MinioSettings(BaseSettings):
@@ -227,17 +242,19 @@ class MinioSettings(BaseSettings):
 
     def update_config(self, **kwargs):
         for k, v in kwargs.items():
-            if isinstance(v, dict) and hasattr(self, k):
-                s = getattr(self, k)
-                for k2, v2 in v.items():
-                    if hasattr(s, k2):
-                        setattr(s, k2, v2)
-            elif not hasattr(self, k): continue
-            else: setattr(self, k, v)
+            if not hasattr(self, k):  continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
 
-    def update_auth(self, **config):
+    def update_auth(self, update_fs: bool = True, **config):
         self.update_config(**config)
         self.set_env()
+
+        # Reset the accessor to use the new settings
+        from fileio.providers.filesys import get_accessor
+        get_accessor('minio', _reset=True)
     
     def build_s3fs_config(self) -> Dict[str, Any]:
         """
@@ -292,28 +309,28 @@ class S3CompatSettings(BaseSettings):
 
     def update_config(self, **kwargs):
         for k, v in kwargs.items():
-            if isinstance(v, dict) and hasattr(self, k):
-                s = getattr(self, k)
-                for k2, v2 in v.items():
-                    if hasattr(s, k2):
-                        setattr(s, k2, v2)
-            elif not hasattr(self, k): continue
-            else: setattr(self, k, v)
+            if not hasattr(self, k): continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
 
     def update_auth(self, **config):
         self.update_config(**config)
         self.set_env()
 
+
+
 class Settings(BaseSettings):
 
     @lazyproperty
     def core(self) -> CoreSettings:
-        return core_settings
+        return CoreSettings()
     
     @lazyproperty
     def aws(self) -> AwsSettings:
         return AwsSettings()
-    
+
     @lazyproperty
     def gcp(self) -> GcpSettings:
         return GcpSettings()
@@ -325,7 +342,7 @@ class Settings(BaseSettings):
     @lazyproperty
     def s3_compat(self) -> S3CompatSettings:
         return S3CompatSettings()
-    
+
     def create_adc(
         self, 
         data: Union[str, Dict[str, Any]], 
@@ -367,12 +384,11 @@ class Settings(BaseSettings):
 
     def update_config(self, **kwargs):
         for k, v in kwargs.items():
-            if isinstance(v, dict) and hasattr(self, k):
-                s = getattr(self, k)
-                for k2, v2 in v.items():
-                    if hasattr(s, k2):
-                        setattr(s, k2, v2)
-            elif not hasattr(self, k): continue
+            if not hasattr(self, k): continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            elif isinstance(getattr(self, k), BaseSettings):
+                getattr(self, k).update_config(**v)
             else: setattr(self, k, v)
 
     def set_env(self):
@@ -381,10 +397,19 @@ class Settings(BaseSettings):
         self.minio.set_env()
         self.s3_compat.set_env()
 
-    def update_auth(self, **config):
+    def update_auth(self, update_fs: bool = True, **config):
         self.update_config(**config)
         self.set_env()
-    
 
+        if update_fs:
+            # Reset the accessor to use the new settings
+            from fileio.providers.filesys import get_accessor
+            if config.get('aws'):
+                get_accessor('s3', _reset = True)
+            if config.get('gcp'):
+                get_accessor('gs', _reset = True)
+            if config.get('minio'):
+                get_accessor('minio', _reset = True)
+    
 
 settings = Settings()

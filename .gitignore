@@ -16,3 +16,5 @@ _fileio/*
 tests/*
 **_setup.py**
 **test**
+
+!validation/*

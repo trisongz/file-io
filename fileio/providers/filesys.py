@@ -430,25 +430,25 @@ _GCPAccessor: GCP_Accessor = None
 _AWSAccessor: AWS_Accessor = None
 _MinioAccessor: Minio_Accessor = None
 
-def _get_gcp_accessor(**kwargs) -> GCP_Accessor:
+def _get_gcp_accessor(_reset: bool = False, **kwargs) -> GCP_Accessor:
     global _GCPAccessor, GCP_Accessor
-    if not _GCPAccessor:
+    if not _GCPAccessor or _reset:
         GCP_CloudFileSystem.build_filesystems(**kwargs)
         GCP_Accessor.reload_cfs(**kwargs)
         _GCPAccessor = GCP_Accessor()
     return _GCPAccessor
 
-def _get_aws_accessor(**kwargs) -> AWS_Accessor:
+def _get_aws_accessor(_reset: bool = False, **kwargs) -> AWS_Accessor:
     global _AWSAccessor, AWS_Accessor
-    if not _AWSAccessor:
+    if not _AWSAccessor or _reset:
         AWS_CloudFileSystem.build_filesystems(**kwargs)
         AWS_Accessor.reload_cfs(**kwargs)
         _AWSAccessor = AWS_Accessor()
     return _AWSAccessor
 
-def _get_minio_accessor(**kwargs) -> Minio_Accessor:
+def _get_minio_accessor(_reset: bool = False, **kwargs) -> Minio_Accessor:
     global _MinioAccessor, Minio_Accessor
-    if not _MinioAccessor:
+    if not _MinioAccessor or _reset:
         Minio_CloudFileSystem.build_filesystems(**kwargs)
         Minio_Accessor.reload_cfs(**kwargs)
         _MinioAccessor = Minio_Accessor()
@@ -478,9 +478,8 @@ CloudFileSystemLike = Union[
     Minio_CloudFileSystem
 ]
 
-def get_accessor(name: str, **kwargs) -> AccessorLike:
-    if not _accessor_getters.get(name, None): return BaseAccessor
-    return _accessor_getters[name](**kwargs)
+def get_accessor(name: str, _reset: bool = False, **kwargs) -> AccessorLike:
+    return _accessor_getters[name](_reset=_reset, **kwargs) if _accessor_getters.get(name, None) else BaseAccessor
 
 def get_cloud_filesystem(name: str) -> Optional[CloudFileSystemLike]:
     return _cfs_getters.get(name, None)
