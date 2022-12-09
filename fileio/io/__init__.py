@@ -10,6 +10,9 @@ from fileio.io._msgpack import MsgPack
 from fileio.io._generator import Generate
 from fileio.io._text import Text
 from fileio.io._yaml import Yaml
+from fileio.io._csv import Csv
+from fileio.io._tsv import Tsv
+from fileio.io._jsonlines import JsonLines
 
 Serializers: Dict[str, BasePack] = {
     'pickle': Pickle,

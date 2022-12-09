@@ -1,4 +1,6 @@
-# file_io
+# file-io
+
+[![PyPI version](https://badge.fury.io/py/file-io.svg)](https://badge.fury.io/py/file-io)
 
  Drop in replacement for `pathlib.Path` with support for Cloud Object Storage with async compatability. 
 

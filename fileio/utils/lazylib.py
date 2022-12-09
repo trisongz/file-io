@@ -5,13 +5,12 @@ Handler to check Class Imports
 """
 import os
 import sys
-import shlex
 import importlib
 import subprocess
 import pkg_resources
 import pathlib
 
-from typing import List, Type, Any, Union, Dict
+from typing import Any, Union, Dict
 from types import ModuleType
 
 
@@ -34,8 +33,7 @@ class LibModuleType(type):
         # Replaces '-' with '_'
         # for any library such as tensorflow-text -> tensorflow_text
         name = name.replace('-', '_')
-        if not clean: return name.strip()
-        return name.split('=')[0].replace('>','').replace('<','').strip()
+        return name.split('=')[0].replace('>', '').replace('<', '').strip() if clean else name.strip()
     
     @classmethod
     def install_library(cls, library: str, upgrade: bool = True):
@@ -70,10 +68,6 @@ class LibModuleType(type):
         if not cls.is_available(clean_lib):
             cls.install_library(pip_name or library, upgrade=upgrade)
 
-    @classmethod
-    def _ensure_binary_installed(cls, binary: str, flags: List[str] = None):
-        return cls.install_binary(binary, flags)
-    
     @classmethod
     def import_lib(cls, library: str, pip_name: str = None, resolve_missing: bool = True, require: bool = False, upgrade: bool = False) -> ModuleType:
         """ Lazily resolves libs.
@@ -125,22 +119,6 @@ class LibModuleType(type):
         mod = cls.import_module(name=module_name, library=library, pip_name=pip_name, resolve_missing = resolve_missing, require = require, upgrade = upgrade)
         return getattr(mod, name)
     
-    @classmethod
-    def import_cmd(cls, binary: str, resolve_missing: bool = True, require: bool = False, flags: List[str] = None):
-        """ Lazily builds a lazy.Cmd based on binary
-        
-            if available, returns the lazy.Cmd(binary)
-            if missing and resolve_missing = True, will lazily install in host system
-        else:
-            if require: raise ImportError
-            returns None
-        """
-        if not cls.is_exec_available(binary):
-            if require and not resolve_missing: raise ImportError(f"Required Executable {binary} is not available.")
-            if not resolve_missing: return None
-            cls.install_binary(binary, flags=flags)
-        from lazy.cmd import Cmd
-        return Cmd(binary=binary)
 
     @classmethod
     def get_binary_path(cls, executable: str):
@@ -210,10 +188,6 @@ class LibModuleType(type):
         if key.startswith('is_imported_'):
             lib_name = key.split('is_imported_')[-1].strip()
             return cls.is_imported(lib_name)
-        
-        if key.startswith('cmd_'):
-            binary_name = key.split('cmd_')[-1].strip()
-            return cls.import_cmd(binary=binary_name)
         
         return cls.import_lib(key, resolve_missing=False, require=False)
     
