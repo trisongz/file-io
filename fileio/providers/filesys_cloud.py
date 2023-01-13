@@ -844,7 +844,8 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """Iterate over the files in this directory.  Does not yield any
         result for the special paths '.' and '..'.
         """
-        for name in await self._accessor.async_listdir(self):
+        # for name in await self._accessor.async_listdir(self):
+        async for name in self._accessor.async_listdir(self):
             if name in {'.', '..'}: continue
             yield self._make_child_relpath(name)
 
@@ -873,7 +874,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         if not pattern: raise ValueError("Unacceptable pattern: {!r}".format(pattern))
         glob_pattern = self._cloudpath + ('/' if self.is_dir() and not self._cloudpath.endswith('/') and not pattern.startswith('/') else '') +  pattern
         try:
-            matches =  await self._accessor.async_glob(glob_pattern)
+            matches = await self._accessor.async_glob(glob_pattern)
             if not matches: return matches
             if self.is_cloud: matches = [f'{self._prefix}://{m}' for m in matches]
             if as_path: matches = [type(self)(m) for m in matches]
