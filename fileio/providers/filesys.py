@@ -384,7 +384,6 @@ class BaseAccessor(NormalAccessor):
         cls.async_listdir: Callable = create_async_method_fs(cls.CloudFileSystem, ['async_listdir', 'async_list_objects'])
 
 
-
 class GCP_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 'gcsfs.GCSFileSystem' = None
     fsa: 'gcsfs.GCSFileSystem' = None

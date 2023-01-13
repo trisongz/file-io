@@ -32,9 +32,9 @@ class _AsyncSelector:
         """Iterate over all child paths of `parent_path` matched by this
         selector.  This can contain parent_path itself."""
         path_cls = type(parent_path)
-        is_dir = path_cls.is_dir
-        exists = path_cls.exists
-        scandir = parent_path._accessor.scandir
+        is_dir = path_cls.async_is_dir
+        exists = path_cls.async_exists
+        scandir = parent_path._accessor.async_scandir
 
         if not await is_dir(parent_path):
             return

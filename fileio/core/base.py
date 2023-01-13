@@ -130,6 +130,9 @@ class _FileAccessor(NormalAccessor):
         async for entry in scandir_async(*args, **kwargs):
             yield entry
 
+    def __enter__(self):
+        return self
+
 _pathz_accessor = _FileAccessor()
 
 
@@ -198,7 +201,15 @@ class FilePath(Path, FilePurePath):
 
     @property
     def _path(self) -> str:
+
         return self._cloudstr if self.is_cloud else str(self)
+    
+    @property
+    def parent(self) -> Type['FilePath']:
+        """
+        The logical parent of the path.
+        """
+        return super().parent
     
     @property
     def checksum(self):
@@ -923,6 +934,18 @@ class FilePath(Path, FilePurePath):
 
         return os.path.samestat(await self.async_stat(),other_st)
 
+    def listdir(self) -> List[FilePath]:
+        """Iterate over the files in this directory.  Does not yield any
+        result for the special paths '.' and '..'.
+        """
+        return [self._make_child_relpath(name) for name in self._accessor.listdir(self)]
+    
+    async def async_listdir(self) -> List[FilePath]:
+        """Iterate over the files in this directory.  Does not yield any
+        result for the special paths '.' and '..'.
+        """
+        return [self._make_child_relpath(name) for name in await self._accessor.async_listdir(self)]
+
     def iterdir(self) -> Iterable[FilePath]:
         """Iterate over the files in this directory.  Does not yield any
         result for the special paths '.' and '..'.
@@ -939,18 +962,25 @@ class FilePath(Path, FilePurePath):
             if name in {'.', '..'}: continue
             yield self._make_child_relpath(name)
 
-    def glob(self, pattern: str) -> Iterable[FilePath]:
+    def glob(self, pattern: str) -> List[FilePath]:
         """Iterate over this subtree and yield all existing files (of any
         kind, including directories) matching the given relative pattern.
         """
         if not pattern: raise ValueError("Unacceptable pattern: {!r}".format(pattern))
+        # yield from self._accessor.glob()
+        # just a hot fix
+        import glob
+        paths = glob.glob(self.joinpath(pattern).as_posix())
+        return [self.__class__(path) for path in paths]
 
-        drv, root, pattern_parts = self._flavour.parse_parts((pattern,))
-        if drv or root: raise NotImplementedError("Non-relative patterns are unsupported")
-        selector = _sync_make_selector(tuple(pattern_parts), self._flavour)
-        yield from selector.select_from(self)
+        # drv, root, pattern_parts = self._flavour.parse_parts((pattern,))
+        # if drv or root: raise NotImplementedError("Non-relative patterns are unsupported")
+        # selector = _sync_make_selector(tuple(pattern_parts), self._flavour)
+        # for p in selector.select_from(self):
+        #     yield p
+        # yield from selector.select_from(self)
 
-    async def async_glob(self, pattern: str) -> AsyncIterable[FilePath]:
+    async def async_glob(self, pattern: str) -> List[FilePath]:
         """Iterate over this subtree and yield all existing files (of any
         kind, including directories) matching the given relative pattern.
         """
@@ -959,22 +989,27 @@ class FilePath(Path, FilePurePath):
         drv, root, pattern_parts = self._flavour.parse_parts((pattern,))
         if drv or root: raise NotImplementedError("Non-relative patterns are unsupported")
         selector = _make_selector(tuple(pattern_parts), self._flavour)
+        paths = []
         async for p in selector.select_from(self):
-            yield p
+            paths.append(p)
+            # yield p
+        return paths
 
-    def rglob(self, pattern: str) -> Iterable[FilePath]:
+    def rglob(self, pattern: str) -> List[FilePath]:
         """Recursively yield all existing files (of any kind, including
         directories) matching the given relative pattern, anywhere in
         this subtree.
         """
-        drv, root, pattern_parts = self._flavour.parse_parts((pattern,))
+        import glob
+        paths = glob.glob(self.joinpath(pattern).as_posix(), recursive=True)
+        return [self.__class__(path) for path in paths]
+        # drv, root, pattern_parts = self._flavour.parse_parts((pattern,))
+        # if drv or root: raise NotImplementedError("Non-relative patterns are unsupported")
+        # parts = ("**", *pattern_parts)
+        # selector = _sync_make_selector(parts, self._flavour)
+        # yield from selector.select_from(self)
 
-        if drv or root: raise NotImplementedError("Non-relative patterns are unsupported")
-        parts = ("**", *pattern_parts)
-        selector = _sync_make_selector(parts, self._flavour)
-        yield from selector.select_from(self)
-
-    async def async_rglob(self, pattern: str) -> AsyncIterable[FilePath]:
+    async def async_rglob(self, pattern: str) -> List[FilePath]:
         """Recursively yield all existing files (of any kind, including
         directories) matching the given relative pattern, anywhere in
         this subtree.

@@ -1,3 +1,7 @@
+Jan 13, 2022 v0.4.4
+- Modify logic for `glob` and `rglob` to return list instead of iterables.
+- Resolve logic for local paths for `listdir` `glob` and `rglob` to return list instead of iterables.
+
 Dec 9, 2022 v0.4.1
 
 - Fix `_get_pathlike` method
