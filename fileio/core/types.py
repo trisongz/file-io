@@ -82,15 +82,32 @@ class File:
     def get_tempfile(
         cls,
         *args,
+        suffix: Optional[str] = None, 
+        prefix: Optional[str] = None,  
+        dir: Optional[str] = None,
         delete: bool = False,
         **kwargs
-    ):
+    ) -> FileLike:
         """
         Creates a new temporary file
         """
-        f = tempfile.NamedTemporaryFile(*args, delete = delete, **kwargs)
+        f: tempfile._TemporaryFileWrapper = tempfile.NamedTemporaryFile(*args, suffix = suffix, prefix = prefix, dir = dir, delete = delete, **kwargs)
         f.close()
         return get_path(f.name)
+    
+    @classmethod
+    def get_tempdir(
+        cls,
+        suffix: Optional[str] = None, 
+        prefix: Optional[str] = None,  
+        dir: Optional[str] = None, 
+        **kwargs
+    ) -> FileLike:
+        """
+        Creates a new temporary directory
+        """
+        d = tempfile.TemporaryDirectory(suffix = suffix, prefix = prefix, dir = dir)
+        return get_path(d.name)
 
 
     @classmethod

@@ -323,6 +323,14 @@ class S3CompatSettings(BaseSettings):
 
 class Settings(BaseSettings):
 
+    read_chunk_size: Optional[int] = 1024 * 64 # 64KB
+    url_chunk_size: Optional[int] = 1024 * 128 # 128KB
+    
+    num_workers: Optional[int] = 12
+    checksum_cache_ttl: Optional[int] = 60 * 60 * 24 * 1 # 1 days
+    enable_progress_bar: Optional[bool] = False
+
+
     @lazyproperty
     def core(self) -> CoreSettings:
         return CoreSettings()
@@ -410,6 +418,10 @@ class Settings(BaseSettings):
                 get_accessor('gs', _reset = True)
             if config.get('minio'):
                 get_accessor('minio', _reset = True)
+    
+    class Config(BaseSettings.Config):
+        env_prefix = "FILEIO_"
+        case_sensitive = False
     
 
 settings = Settings()
