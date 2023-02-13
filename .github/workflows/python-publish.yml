@@ -12,6 +12,8 @@ on:
   push:
     paths:
       - 'setup.py'
+    branches:
+      - main
   release:
     types: [created]
 
