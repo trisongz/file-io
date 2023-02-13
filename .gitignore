@@ -19,3 +19,4 @@ tests/*
 
 validation/private_*
 !validation/
+fileio/providers/hffs/*

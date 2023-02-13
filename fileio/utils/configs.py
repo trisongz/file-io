@@ -113,7 +113,7 @@ class AwsSettings(BaseSettings):
 
         if update_fs:
             # Reset the accessor to use the new settings
-            from fileio.providers.filesys import get_accessor
+            from fileio.lib.posix.filesys import get_accessor
             get_accessor('s3', _reset=True)
 
     def build_s3fs_config(self) -> Dict[str, Any]:
@@ -202,7 +202,7 @@ class GcpSettings(BaseSettings):
 
         if update_fs:
             # Reset the accessor to use the new settings
-            from fileio.providers.filesys import get_accessor
+            from fileio.lib.posix.filesys import get_accessor
             get_accessor('gs', _reset=True)
 
     
@@ -253,7 +253,7 @@ class MinioSettings(BaseSettings):
         self.set_env()
 
         # Reset the accessor to use the new settings
-        from fileio.providers.filesys import get_accessor
+        from fileio.lib.posix.filesys import get_accessor
         get_accessor('minio', _reset=True)
     
     def build_s3fs_config(self) -> Dict[str, Any]:
@@ -283,9 +283,11 @@ class S3CompatSettings(BaseSettings):
     s3_compat_endpoint: Optional[str] = None
     s3_compat_access_key: Optional[str] = None
     s3_compat_secret_key: Optional[str] = None
+    s3_compat_access_token: Optional[str] = None
     s3_compat_secure: Optional[bool] = True
     s3_compat_region: Optional[str] = None
     s3_compat_config: Optional[Union[str, Dict[str, Any]]] = None
+    s3_compat_signature_ver: Optional[str] = 's3v4'
 
     class Config:
         env_prefix: str = ""
@@ -302,6 +304,8 @@ class S3CompatSettings(BaseSettings):
             os.environ["S3_COMPAT_ACCESS_KEY"] = self.s3_compat_access_key
         if self.s3_compat_secret_key:
             os.environ["S3_COMPAT_SECRET_KEY"] = self.s3_compat_secret_key
+        if self.s3_compat_access_token:
+            os.environ["S3_COMPAT_ACCESS_TOKEN"] = self.s3_compat_access_token
         if self.s3_compat_secure:
             os.environ["S3_COMPAT_SECURE"] = str(self.s3_compat_secure)
         if self.s3_compat_region:
@@ -318,8 +322,146 @@ class S3CompatSettings(BaseSettings):
     def update_auth(self, **config):
         self.update_config(**config)
         self.set_env()
+    
+
+    def build_s3fs_config(self) -> Dict[str, Any]:
+        """
+        Builds the s3fs config dict
+        """
+        config = {
+            "client_kwargs": {
+                "endpoint_url": self.s3_compat_endpoint,
+                "region_name": self.s3_compat_region,
+            },
+            "config_kwargs": {
+                "signature_version": self.s3_compat_signature_ver,
+            }
+        }
+        if self.s3_compat_access_key:
+            config["key"] = self.s3_compat_access_key
+        if self.s3_compat_secret_key:
+            config["secret"] = self.s3_compat_secret_key
+        if self.s3_compat_access_token:
+            config["token"] = self.s3_compat_access_token
+        if self.s3_compat_config:
+            config["config_kwargs"].update(self.s3_compat_config)
+        return config
 
 
+
+class GithubSettings(BaseSettings):
+    github_org: Optional[str] = None
+    github_repo: Optional[str] = None
+    github_user: Optional[str] = None
+    github_token: Optional[str] = None
+    github_sha: Optional[str] = None
+
+    class Config:
+        env_prefix: str = ""
+        case_sensitive = False
+
+    def set_env(self):
+        if self.github_org:
+            os.environ["GITHUB_ORG"] = self.github_org
+        if self.github_repo:
+            os.environ["GITHUB_REPO"] = self.github_repo
+        if self.github_user:
+            os.environ["GITHUB_USER"] = self.github_user
+        if self.github_token:
+            os.environ["GITHUB_TOKEN"] = self.github_token
+        if self.github_sha:
+            os.environ["GITHUB_SHA"] = self.github_sha
+
+    def update_config(self, **kwargs):
+        for k, v in kwargs.items():
+            if not hasattr(self, k): continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
+
+    def update_auth(self, **config):
+        self.update_config(**config)
+        self.set_env()
+
+    def build_githubfs_config(self) -> Dict[str, Any]:
+        """
+        Builds the githubfs config dict
+        """
+        config = {
+            'org': self.github_org,
+            'repo': self.github_repo,
+            'user': self.github_user,
+            'token': self.github_token,
+            'sha': self.github_sha,
+        }
+        return {k: v for k, v in config.items() if v is not None}
+
+class HuggingfaceSettings(BaseSettings):
+
+    hf_token: Optional[str] = None
+    huggingface_token: Optional[str] = None
+    hugging_face_hub_token: Optional[str] = None
+
+    hf_org: Optional[str] = None
+    hf_user: Optional[str] = None
+    hf_repo: Optional[str] = None
+
+    huggingface_org: Optional[str] = None
+    huggingface_user: Optional[str] = None
+    huggingface_repo: Optional[str] = None
+
+    hf_repo_id: Optional[str] = None
+    huggingface_repo_id: Optional[str] = None
+
+    hf_repo_type: Optional[str] = None
+    huggingface_repo_type: Optional[str] = None
+
+    class Config:
+        env_prefix: str = ""
+        case_sensitive = False
+
+    @lazyproperty
+    def token(self) -> str:
+        return self.hf_token or self.huggingface_token or self.hugging_face_hub_token
+    
+    @lazyproperty
+    def org(self) -> str:
+        return self.hf_org or self.huggingface_org
+    
+    @lazyproperty
+    def user(self) -> str:
+        return self.hf_user or self.huggingface_user
+    
+    @lazyproperty
+    def repo(self) -> str:
+        return self.hf_repo or self.huggingface_repo
+    
+    @lazyproperty
+    def repo_id(self) -> str:
+        return (
+            self.hf_repo_id
+            or self.huggingface_repo_id
+            or f"{self.org or self.user}/{self.repo}"
+        )
+
+    @lazyproperty
+    def repo_type(self) -> str:
+        return self.hf_repo_type or self.huggingface_repo_type
+    
+    def set_env(self):
+        if self.token:
+            os.environ["HUGGING_FACE_HUB_TOKEN"] = self.token
+        if self.repo_id:
+            os.environ["HF_REPO_ID"] = self.repo_id
+
+    def update_config(self, **kwargs):
+        for k, v in kwargs.items():
+            if not hasattr(self, k): continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
 
 class Settings(BaseSettings):
 
@@ -329,7 +471,7 @@ class Settings(BaseSettings):
     num_workers: Optional[int] = 12
     checksum_cache_ttl: Optional[int] = 60 * 60 * 24 * 1 # 1 days
     enable_progress_bar: Optional[bool] = False
-
+    tfio_enabled: Optional[bool] = False
 
     @lazyproperty
     def core(self) -> CoreSettings:
@@ -350,6 +492,14 @@ class Settings(BaseSettings):
     @lazyproperty
     def s3_compat(self) -> S3CompatSettings:
         return S3CompatSettings()
+    
+    @lazyproperty
+    def github(self) -> GithubSettings:
+        return GithubSettings()
+    
+    @lazyproperty
+    def huggingface(self) -> HuggingfaceSettings:
+        return HuggingfaceSettings()
 
     def create_adc(
         self, 
@@ -404,6 +554,8 @@ class Settings(BaseSettings):
         self.gcp.set_env()
         self.minio.set_env()
         self.s3_compat.set_env()
+        self.github.set_env()
+        self.huggingface.set_env()
 
     def update_auth(self, update_fs: bool = True, **config):
         self.update_config(**config)
@@ -411,13 +563,17 @@ class Settings(BaseSettings):
 
         if update_fs:
             # Reset the accessor to use the new settings
-            from fileio.providers.filesys import get_accessor
+            from fileio.lib.posix.filesys import FileSysManager
+            # from fileio.providers.filesys import get_accessor
             if config.get('aws'):
-                get_accessor('s3', _reset = True)
+                FileSysManager.get_accessor('s3', _reset = True)
+                # get_accessor('s3', _reset = True)
             if config.get('gcp'):
-                get_accessor('gs', _reset = True)
+                FileSysManager.get_accessor('gs', _reset = True)
+                # get_accessor('gs', _reset = True)
             if config.get('minio'):
-                get_accessor('minio', _reset = True)
+                FileSysManager.get_accessor('minio', _reset = True)
+                # get_accessor('minio', _reset = True)
     
     class Config(BaseSettings.Config):
         env_prefix = "FILEIO_"

@@ -5,10 +5,12 @@ from setuptools import setup, find_packages
 if sys.version_info.major != 3:
     raise RuntimeError("This package requires Python 3+")
 
-version = '0.4.5'
 pkg_name = 'file-io'
 gitrepo = 'trisongz/file-io'
+
 root = Path(__file__).parent
+version = root.joinpath(f'{pkg_name}/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
+
 
 requirements = [
     'anyio',

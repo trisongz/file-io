@@ -5,6 +5,7 @@ Handler to check Class Imports
 """
 import os
 import sys
+import json
 import importlib
 import subprocess
 import pkg_resources
@@ -25,6 +26,8 @@ def get_variable_separator():
     :return: Environment variable separator
     """
     return ';' if sys.platform.startswith('win') else ':'
+
+_lib_resolver_file = pathlib.Path(__file__).parent.joinpath('.lazylib.json')
 
 class LibModuleType(type):
     

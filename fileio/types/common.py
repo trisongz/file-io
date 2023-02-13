@@ -34,14 +34,12 @@ __all__ = (
     'FileMode',
     'NoneType',
     'aobject',
-    'FileInfo',
     'BaseModel'
 )
 
 import os
 import sys
-import datetime
-from typing import Any, AnyStr, Dict, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union, TYPE_CHECKING
+from typing import Any, AnyStr, Dict, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 from types import ModuleType
 from pydantic import BaseModel
 
@@ -101,92 +99,3 @@ class aobject(object):
 
     async def __init__(self, *args, **kwargs):
         pass
-
-if TYPE_CHECKING:
-    from fileio.core.types import FileLike
-
-class FileInfo(BaseModel):
-    size: Optional[int] = None
-    etag: Optional[str] = None
-    last_modified: Optional[datetime.datetime] = None
-    checksum: Optional[str] = None
-    path: Optional['FileLike'] = None
-
-    class Config:
-        allow_arbitrary_types = True
-
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
-        if d['path']: d['path'] = self.path.as_posix()
-        return d
-
-    def validate_info(self):
-        """
-        Ensures that the file info is valid.
-        """
-        if not self.path or not self.path.exists():
-            raise ValueError('Path does not exist.')
-        if self.checksum is None:
-            from fileio.utils.ops import checksum_file
-            self.checksum = checksum_file(self.path)
-        if not all(self.size, self.etag, self.last_modified):
-            info: Dict[str, Any] = self.path.info()
-            self.size = info.get('size', info.get('Size', 0))
-            self.etag = info.get('ETag') or 'none'
-            self.last_modified = info.get('LastModified')
-        
-    async def async_validate_info(self):
-        """
-        Ensures that the file info is valid.
-        """
-        if not self.path or not await self.path.async_exists():
-            raise ValueError('Path does not exist.')
-        if self.checksum is None:
-            from fileio.utils.ops import async_checksum_file
-            self.checksum = await async_checksum_file(self.path)
-        if not all(self.size, self.etag, self.last_modified):
-            info: Dict[str, Any] = await self.path.async_info()
-            self.size = info.get('size', info.get('Size', 0))
-            self.etag = info.get('ETag') or 'none'
-            self.last_modified = info.get('LastModified')
-
-    @classmethod
-    def get_info(cls, path: 'FileLike') -> 'FileInfo':
-        """
-        Fetches file info from the given path.
-        """
-        from fileio import File
-        from fileio.utils.ops import checksum_file
-
-        path = File(path)
-        file_info: Dict[str, Any] = path.info()
-        return cls(
-            size = file_info.get('size', file_info.get('Size', 0)),
-            etag = file_info.get('ETag') or 'none',
-            last_modified = file_info.get('LastModified'),
-            checksum = checksum_file(path = path),
-            path = path
-        )
-    
-    @classmethod
-    async def async_get_info(cls, path: 'FileLike') -> 'FileInfo':
-        """
-        Fetches file info from the given path.
-        """
-        from fileio import File
-        from fileio.utils.ops import async_checksum_file
-        
-        path = File(path)
-        file_info: Dict[str, Any] = await path.async_info()
-        return cls(
-            size = file_info.get('size', file_info.get('Size', 0)),
-            etag = file_info.get('ETag') or 'none',
-            last_modified = file_info.get('LastModified'),
-            checksum = await async_checksum_file(path = path),
-            path = path
-        )
-
-    def __eq__(self, other):
-        if isinstance(other, FileInfo):
-            return self.checksum == other.checksum
-        return False

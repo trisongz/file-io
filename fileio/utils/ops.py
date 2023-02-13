@@ -11,7 +11,7 @@ from .helpers import timed_cache
 from .configs import settings
 
 if TYPE_CHECKING:
-    from fileio.core.types import FileLike
+    from fileio.lib.types import FileLike
     with contextlib.suppress(ImportError):
         from starlette.requests import Request
         from starlette.datastructures import UploadFile
@@ -31,7 +31,7 @@ def checksum_file(path: 'FileLike', chunk_size: Optional[int] = None) -> str:
     :param path: The path to the file
     :param chunk_size: The size of the chunks to read from the file (default is 64kb)
     """
-    from fileio import File
+    from fileio.lib.types import File
 
     if not chunk_size: chunk_size = settings.read_chunk_size
     path = File(path)
@@ -54,13 +54,13 @@ async def async_checksum_file(path: 'FileLike', chunk_size: Optional[int] = None
     :param path: The path to the file
     :param chunk_size: The size of the chunks to read from the file (default is 64kb)
     """
-    from fileio import File
+    from fileio.lib.types import File
 
     if not chunk_size: chunk_size = settings.read_chunk_size
     path = File(path)
     sha256_hash = hashlib.sha256()
     async with path.async_open('rb') as f:
-        if path.is_cloud:
+        if not path.is_cloud:
             for byte_block in await iter(lambda: f.read(chunk_size), b""):
                 sha256_hash.update(byte_block)
         else:
@@ -86,7 +86,7 @@ def fetch_file_from_url(
     """
     Fetches a file from a URL and saves it to the specified path.
     """
-    from fileio import File
+    from fileio.lib.types import File
 
     assert '://' in url, f'Invalid URL: {url}'
     if not chunk_size: chunk_size = settings.url_chunk_size
@@ -120,7 +120,7 @@ async def async_fetch_file_from_url(
     """
     Fetches a file from a URL and saves it to the specified path.
     """
-    from fileio import File
+    from fileio.lib.types import File
 
     assert '://' in url, f'Invalid URL: {url}'
 
