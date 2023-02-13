@@ -1,6 +1,6 @@
 
 from typing import Dict, Any, Union, List
-from ._base import BasePack
+from .base import BasePack
 
 class Text:
     list_delimiters: List[str] = [",", ";"]
