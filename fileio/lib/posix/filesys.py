@@ -97,8 +97,8 @@ CloudFileSystemLike = Union[
     CloudFileSystemType,
     GCP_CloudFileSystem,
     AWS_CloudFileSystem,
-    S3Compat_CloudFileSystem,
     Minio_CloudFileSystem,
+    S3Compat_CloudFileSystem,
     # HF_CloudFileSystem,
 ]
 
@@ -148,15 +148,6 @@ class AccessorMeta(type):
             cls.ax['s3c'] = S3Compat_Accessor()
         return cls.ax['s3c']
 
-    # @property
-    # def ax_map(cls):
-    #     return {
-    #         'gs': cls.get_gcp_accessor,
-    #         's3': cls.get_aws_accessor,
-    #         'minio': cls.get_minio_accessor,
-    #         's3c': cls.get_s3c_accessor,
-    #     }
-
     @classmethod
     def get_accessor(
         cls, 
@@ -169,8 +160,6 @@ class AccessorMeta(type):
         """
         _ax = getattr(cls, f'get_{name}_accessor', None)
         return _ax(_reset=_reset, **kwargs) if _ax else BaseAccessor
-        # if name not in cls.ax_map: return BaseAccessor
-        # return cls.ax_map[name](_reset=_reset, **kwargs)
     
     @classmethod
     def get_fs(

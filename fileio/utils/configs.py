@@ -5,7 +5,6 @@ import multiprocessing as mp
 from pydantic import BaseSettings, validator
 
 from typing import Optional, Dict, Any, Union
-
 from fileio.utils.logs import default_logger as logger
 from fileio.types.classprops import lazyproperty
 
@@ -554,8 +553,8 @@ class Settings(BaseSettings):
         self.gcp.set_env()
         self.minio.set_env()
         self.s3_compat.set_env()
-        self.github.set_env()
-        self.huggingface.set_env()
+        # self.github.set_env()
+        # self.huggingface.set_env()
 
     def update_auth(self, update_fs: bool = True, **config):
         self.update_config(**config)

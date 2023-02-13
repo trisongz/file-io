@@ -13,6 +13,7 @@ from fileio.lib.base import *
 from fileio.providers.gcs import *
 from fileio.providers.s3 import *
 from fileio.providers.minio import *
+from fileio.providers.s3c import *
 
 from fileio.lib.apis import (
     FastUploadFile,
@@ -32,24 +33,34 @@ FileLike = Union[
     Type[FileWindowsPath],
     Type[FilePosixPath],
     Type[PureFileWindowsPath],
+    
     Type[FileGSPurePath],
     Type[FileGSPath],
     Type[PureFileGSPosixPath],
     Type[FileGSWindowsPath],
     Type[FileGSPosixPath],
     Type[PureFileGSWindowsPath],
+    
     Type[FileS3PurePath],
     Type[FileS3Path],
     Type[PureFileS3PosixPath],
     Type[FileS3WindowsPath],
     Type[FileS3PosixPath],
     Type[PureFileS3WindowsPath],
+
     Type[FileMinioPurePath], 
     Type[FileMinioPath], 
     Type[PureFileMinioPosixPath], 
     Type[FileMinioWindowsPath], 
     Type[FileMinioPosixPath], 
-    Type[PureFileMinioWindowsPath]
+    Type[PureFileMinioWindowsPath],
+
+    Type[FileS3CPurePath],
+    Type[FileS3CPath],
+    Type[PureFileS3CPosixPath],
+    Type[FileS3CWindowsPath],
+    Type[FileS3CPosixPath],
+    Type[PureFileS3CWindowsPath],
 
 ]
 
@@ -60,30 +71,41 @@ _PATHLIKE_CLS: Tuple[FileLike, ...] = (
     FileWindowsPath,
     FilePosixPath,
     PureFileWindowsPath,
+    
     FileGSPurePath,
     FileGSPath,
     PureFileGSPosixPath,
     FileGSWindowsPath,
     FileGSPosixPath,
     PureFileGSWindowsPath,
+    
     FileS3PurePath,
     FileS3Path,
     PureFileS3PosixPath,
     FileS3WindowsPath,
     FileS3PosixPath,
     PureFileS3WindowsPath,
+
     FileMinioPurePath, 
     FileMinioPath, 
     PureFileMinioPosixPath, 
     FileMinioWindowsPath, 
     FileMinioPosixPath, 
-    PureFileMinioWindowsPath
+    PureFileMinioWindowsPath,
+
+    FileS3CPurePath,
+    FileS3CPath,
+    PureFileS3CPosixPath,
+    FileS3CWindowsPath,
+    FileS3CPosixPath,
+    PureFileS3CWindowsPath,
 )
 
 FileSysLike = Union[
     Type[AWSFileSystem],
     Type[GCPFileSystem],
     Type[MinioFileSystem],
+    Type[S3CFileSystem],
 ]
 
 PathLike = Union[str, os.PathLike, FileLike]
@@ -128,6 +150,9 @@ _PREFIXES_TO_CLS: Dict[str, FileLike] = {
     #'s3a://': FileMinioPath,
     'mio://': FileMinioPath,
     'minio://': FileMinioPath,
+
+    's3compat://': FileS3CPath,
+    's3c://': FileS3CPath,
     #'minio://': cloud.PosixMinioPath,
     #'s3compat://': cloud.PosixS3CompatPath,
 }
@@ -410,4 +435,5 @@ __all__ = (
     'FileS3Path', 
     'FileGSPath', 
     'FileLike',
+    'FileS3CPath',
 )
