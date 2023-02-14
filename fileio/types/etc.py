@@ -1,3 +1,4 @@
+
 import datetime
 import contextlib
 from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
@@ -205,6 +206,54 @@ class PreparedFile(BaseModel):
     def file_info(self) -> FileInfo:
         return FileInfo.get_info(self.source_path)
     
+    def as_posix(self, **kwargs):
+        return self.source_path.as_posix(**kwargs)
+    
+    def to_posix(
+        self, 
+        local_required: Optional[bool] = False, 
+        remote_required: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """
+        Returns the path as a posix path.
+        """
+        if remote_required:
+            if not self.remote_path:
+                raise ValueError(f'Remote path is required and source path: {self.source_path} is not remote.')
+            return self.remote_path.as_posix(**kwargs)
+        if local_required:
+            if not self.local_path and not self.remote_path:
+                raise ValueError(f'Local path is required and source path: {self.source_path} is not local.')
+            if not self.local_path:
+                from fileio import File
+                self.local_path = self.remote_path.copy_file(dest = File.get_tempfile())
+            return self.local_path.as_posix(**kwargs)
+        return self.source_path.as_posix(**kwargs)
+        # raise ValueError(f'Local path is required and source path: {self.source_path} is not local.')
+    
+    async def async_to_posix(
+        self, 
+        local_required: Optional[bool] = False, 
+        remote_required: Optional[bool] = False,
+        **kwargs,
+    ) -> str:
+        """
+        Returns the path as a posix path.
+        """
+        if remote_required:
+            if not self.remote_path:
+                raise ValueError(f'Remote path is required and source path: {self.source_path} is not remote.')
+            return self.remote_path.as_posix(**kwargs)
+        if local_required:
+            if not self.local_path and not self.remote_path:
+                raise ValueError(f'Local path is required and source path: {self.source_path} is not local.')
+            if not self.local_path:
+                from fileio import File
+                self.local_path = await self.remote_path.async_copy_file(dest = File.get_tempfile())
+            return self.local_path.as_posix(**kwargs)
+        return self.source_path.as_posix(**kwargs)
+    
     @classmethod
     def from_path(cls, path: 'FileLike', **kwargs):
         from fileio import File
@@ -381,6 +430,18 @@ class PreparedFile(BaseModel):
         if remote_files or remote_form_keys:
             return await cls.async_from_remote(request = request, remote_files = remote_files, remote_form_keys = remote_form_keys, **kwargs)
         return await cls.async_from_upload(request = request, upload_files = upload_files, upload_form_keys = upload_form_keys, **kwargs)
+
+    def read_bytes(self, *args, **kwargs):
+        return self.source_path.read_bytes(*args, **kwargs)
+    
+    def read_text(self, *args, **kwargs):
+        return self.source_path.read_text(*args, **kwargs)
+    
+    async def async_read_bytes(self, *args, **kwargs):
+        return await self.source_path.async_read_bytes(*args, **kwargs)
+    
+    async def async_read_text(self, *args, **kwargs):
+        return await self.source_path.async_read_text(*args, **kwargs)
 
     class Config:
         allow_arbitrary_types = True

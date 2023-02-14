@@ -6,6 +6,7 @@ import os
 import inspect
 import pathlib
 import tempfile
+import atexit
 
 from fileio.lib.core import pathlib
 from fileio.lib.base import *
@@ -255,6 +256,7 @@ class File:
         prefix: Optional[str] = None,  
         dir: Optional[str] = None,
         delete: bool = False,
+        delete_on_exit: Optional[bool] = True,
         **kwargs
     ) -> FileLike:
         """
@@ -262,7 +264,10 @@ class File:
         """
         f: tempfile._TemporaryFileWrapper = tempfile.NamedTemporaryFile(*args, suffix = suffix, prefix = prefix, dir = dir, delete = delete, **kwargs)
         f.close()
-        return get_path(f.name)
+        p = get_path(f.name)
+        if delete_on_exit:
+            atexit.register(p.unlink, missing_ok = True)
+        return p
     
     @classmethod
     def get_tempdir(
@@ -270,13 +275,17 @@ class File:
         suffix: Optional[str] = None, 
         prefix: Optional[str] = None,  
         dir: Optional[str] = None, 
+        delete_on_exit: Optional[bool] = False,
         **kwargs
     ) -> FileLike:
         """
         Creates a new temporary directory
         """
         d = tempfile.TemporaryDirectory(suffix = suffix, prefix = prefix, dir = dir)
-        return get_path(d.name)
+        p = get_path(d.name)
+        if delete_on_exit:
+            atexit.register(p.rmdir, missing_ok = True)
+        return p
 
 
     @classmethod

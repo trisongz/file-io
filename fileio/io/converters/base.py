@@ -12,7 +12,12 @@ from fileio.types.etc import ParsedFile, PreparedFile
 from fileio.utils import logger
 from fileio.utils.pooler import ThreadPooler
 from fileio.utils.configs import settings
-from fileio.utils.ops import async_checksum_file, checksum_file
+from fileio.utils.ops import (
+    async_checksum_file, 
+    checksum_file,
+    fetch_file_from_url,
+    async_fetch_file_from_url
+) 
 
 from .static import KNOWN_LIGATURES
 
@@ -125,7 +130,10 @@ class BaseConverter(ABC):
         """
         Prepares a single file for extraction
         """
-        file = File(file)
+        # file = File(file)
+        file = fetch_file_from_url(file) if isinstance(file, str) and file.startswith('http') \
+            else File(file)
+        
         if not file.exists():
             if self.raise_errors: raise FileNotFoundError(f"File {file} does not exist")
             logger.warning(f"File {file} does not exist")
@@ -147,7 +155,10 @@ class BaseConverter(ABC):
         """
         Prepares a single file for extraction
         """
-        file = File(file)
+        file = await async_fetch_file_from_url(file) if isinstance(file, str) and file.startswith('http') \
+            else File(file)
+
+        # file = File(file)        
         if not await file.async_exists():
             if self.raise_errors: raise FileNotFoundError(f"File {file} does not exist")
             logger.warning(f"File {file} does not exist")
@@ -177,7 +188,13 @@ class BaseConverter(ABC):
         """
         if files is not None:
             if not isinstance(files, list): files = [files]
-            files = [File(f) for f in files]
+            files = [
+                fetch_file_from_url(f)
+                if (isinstance(f, str) and f.startswith('http'))
+                else File(f)
+                for f in files
+            ]
+            # files = [File(f) for f in files]
             prepared_files = []
             for file in files:
                 if not await file.async_exists():
