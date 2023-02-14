@@ -9,7 +9,7 @@ pkg_name = 'file-io'
 gitrepo = 'trisongz/file-io'
 
 root = Path(__file__).parent
-version = root.joinpath(f'{pkg_name}/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
+version = root.joinpath('fileio/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
 
 
 requirements = [
