@@ -2,6 +2,8 @@
 """
 Contains the base metaclass for providers
 """
+import atexit
+import asyncio
 from types import ModuleType
 from typing import Callable, Any, Optional, Coroutine, Type, Union, List, ClassVar, TYPE_CHECKING
 
@@ -40,6 +42,7 @@ class CloudFileSystemType(type):
             if tfFS.enabled:
                 logger.info('Leveraging Tensorflow IO support for GCS')
                 cls.tffs = tfFS
+        
     
     # @classmethod
     def build_s3fs(cls, **auth_config):
@@ -105,19 +108,27 @@ class CloudFileSystemType(type):
         
         cls.s3t = create_s3t
 
+    # def close_filesystems(cls):
+    #     if cls.fs is not None:
+    #         cls.fs.close_session(asyncio.get_running_loop(), cls.fs.)
+    #     if cls.fsa is not None:
+    #         cls.fsa.close_session()
+
     # @classmethod
-    def build_filesystems(cls, force: bool = False, **auth_config):
+    def build_filesystems(self, force: bool = False, **auth_config):
         """
         Lazily inits the filesystems
         """
-        if cls.fs is not None and cls.fsa is not None and not force: 
+        if self.fs is not None and self.fsa is not None and not force: 
             return
-        if cls.fs_name == 's3fs':
-            cls.build_s3fs(**auth_config)
-        elif cls.fs_name == 'minio':
-            cls.build_minio(**auth_config)
-        elif cls.fs_name == 'gcsfs':
-            cls.build_gcsfs(**auth_config)
+        if self.fs_name == 's3fs':
+            self.build_s3fs(**auth_config)
+        elif self.fs_name == 'minio':
+            self.build_minio(**auth_config)
+        elif self.fs_name == 'gcsfs':
+            self.build_gcsfs(**auth_config)
+        
+        # atexit.register(cls.close_filesystems)
 
 
     @classmethod

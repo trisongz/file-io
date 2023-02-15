@@ -255,7 +255,7 @@ class PreparedFile(BaseModel):
         return self.source_path.as_posix(**kwargs)
     
     @classmethod
-    def from_path(cls, path: 'FileLike', **kwargs):
+    def from_path(cls, path: 'FileLike', is_tmp: Optional[bool] = None, **kwargs):
         from fileio import File
         from fileio.utils.ops import checksum_file
         p = File(path)
@@ -263,14 +263,14 @@ class PreparedFile(BaseModel):
         kws = {
             'local_path': None if p.is_cloud else p,
             'remote_path': p if p.is_cloud else None,
-            'is_tmp': not p.is_cloud,
+            'is_tmp': is_tmp if is_tmp is not None else (not p.is_cloud and p.is_temp),
             'checksum': cksum,
             **kwargs,
         }
         return cls.parse_obj(kws)
     
     @classmethod
-    async def async_from_path(cls, path: 'FileLike', **kwargs):
+    async def async_from_path(cls, path: 'FileLike', is_tmp: Optional[bool] = None, **kwargs):
         from fileio import File
         from fileio.utils.ops import async_checksum_file
         p = File(path)
@@ -278,7 +278,7 @@ class PreparedFile(BaseModel):
         kws = {
             'local_path': None if p.is_cloud else p,
             'remote_path': p if p.is_cloud else None,
-            'is_tmp': not p.is_cloud,
+            'is_tmp': is_tmp if is_tmp is not None else (not p.is_cloud and p.is_temp),
             'checksum': cksum,
             **kwargs,
         }

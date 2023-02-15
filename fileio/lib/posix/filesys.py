@@ -1,5 +1,6 @@
-
+import atexit
 import contextlib
+from fsspec.asyn import sync
 from typing import Callable, Any, Optional, Union, Dict, Type, TYPE_CHECKING
 
 from fileio.lib.posix.meta import CloudFileSystemType, BaseAccessor
@@ -29,6 +30,7 @@ class AWS_CloudFileSystem(metaclass=CloudFileSystemType):
     boto: 'boto3.session.Session' = None
     s3t: Callable = None
 
+
 class Minio_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 's3fs.S3FileSystem' = None
     fsa: 's3fs.S3FileSystem' = None
@@ -42,6 +44,31 @@ class S3Compat_CloudFileSystem(metaclass=CloudFileSystemType):
     fs_name: str = 's3c'
     boto: 'boto3.session.Session' = None
     s3t: Callable = None
+
+    # async def _aonexit(self, *args, **kwargs):
+    #     """
+    #     On Exit Function
+    #     """
+    #     await self.fs.s3.close()
+    #     await self.fsa.s3.close()
+
+    # def _onexit(self, *args, **kwargs):
+    #     """
+    #     On Exit Function
+    #     """
+    #     sync(
+    #         self.fs.loop,
+    #         self.fs.s3.close
+    #     )
+    #     sync(
+    #         self.fsa.loop,
+    #         self.fsa.s3.close
+    #     )
+    #     # self.fs.s3.close()
+    #     # self.fsa.s3.close()
+    
+
+
 
 # class HF_CloudFileSystem(metaclass=CloudFileSystemType):
 #     fs: 'HfFileSystem' = None
@@ -130,6 +157,7 @@ class AccessorMeta(type):
             AWS_CloudFileSystem.build_filesystems(**kwargs)
             AWS_Accessor.reload_cfs(**kwargs)
             cls.ax['s3'] = AWS_Accessor()
+            # atexit.register(AWS_CloudFileSystem._onexit)
         return cls.ax['s3']
     
     @classmethod

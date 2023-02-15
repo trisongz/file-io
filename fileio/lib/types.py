@@ -8,7 +8,7 @@ import pathlib
 import tempfile
 import atexit
 
-from fileio.lib.core import pathlib
+from fileio.lib.core import pathlib, IterableAIOFile
 from fileio.lib.base import *
 
 from fileio.providers.gcs import *
@@ -21,8 +21,9 @@ from fileio.lib.apis import (
     StarletteUploadFile,
     StarliteUploadFile,
 )
-
+from fileio.types.classprops import lazyproperty
 from fileio.types.options import LoadMode
+from fileio.utils.logs import logger
 from fileio.utils.pooler import ThreadPooler
 from typing import Union, Any, TypeVar, List, Optional, Callable, Dict, Type, Tuple, TYPE_CHECKING
 
@@ -433,6 +434,419 @@ class File:
             return cls.load_text(file = _file)
         raise ValueError(f'Unknown file extension: {_file.extension}')
         
+
+
+class StatelessFile:
+    
+    """
+    Stateless file are written to a local file during transactions
+    and then uploaded to the remote storage once the transaction is complete.
+    """
+
+    def __init__(
+        self, 
+        input_file:  Optional[FileLike] = None,
+        output_file: Optional[FileLike] = None,
+        overwrite: Optional[bool] = False,
+        load_file: Optional[bool] = False, 
+        mode: LoadMode = 'default', 
+        loader: Callable = None, 
+        enable_auto_filename: Optional[bool] = None,
+        output_file_suffix: Optional[str] = None,
+        **kwargs
+    ):
+        if input_file:
+            input_file = get_filelike(input_file, **kwargs)
+            if load_file: input_file = File.load_file(file = input_file, mode = mode, loader = loader)
+        self.file: FileLike = input_file if input_file is not None else None
+        self._enable_auto_filename = enable_auto_filename
+        self._output_file_suffix = output_file_suffix
+        
+        self._temp_src_file = File.get_tempfile(delete_on_exit = False)
+        self._temp_out_file = File.get_tempfile(delete_on_exit = False)
+
+        # self.output_file = File(output_file) if output_file is not None else None
+        self._prepare_output_file(output_file = output_file)
+        self.overwrite = overwrite
+        # self._write_ready: bool = False
+        self._read_ready: bool = False
+        self._ready: bool = self.output_file is not None
+        self._closed: bool = False
+        atexit.register(self._onexit)
+    
+    def _create_autofile(self, file: FileLike, suffix: Optional[str] = None):
+        """
+        Creates an auto filename for the given file.
+        """
+        suffix = suffix or self._output_file_suffix or file.suffix
+        file_dir: FileLike = file.parent if file.is_file() else file
+        for i in range(100):
+            output_file = file_dir.joinpath(f'{file.stem}_v{str(i).zfill(3)}{suffix}')
+            if not output_file.exists():
+                break
+        return output_file
+
+    def _prepare_output_file(self, output_file: Optional[FileLike] = None):
+        """
+        Prepares the output file for writing.
+        - designed to handle edge cases where the output_file param
+          is relative, is a directory, or is a file that already exists.
+        """
+        self.output_file: FileLike = None
+        if not output_file: 
+            if self.file and self._enable_auto_filename:
+                self.output_file = self._create_autofile(file = self.file)
+            return
+        output_file = File(output_file)
+        if not output_file.is_file():
+            if self.file and self._enable_auto_filename:
+                self.output_file = self._create_autofile(file = self.file)
+            elif self.file:
+                output_file = (
+                    output_file.joinpath(
+                        f'{self.file.stem}_output{self._output_file_suffix or self.file.suffix}'
+                    )
+                    if output_file.joinpath(self.file.stem + (self._output_file_suffix or self.file.suffix)).exists()
+                    else output_file.joinpath(self.file.stem + (self._output_file_suffix or self.file.suffix))
+                )
+            else:
+                self.output_file = output_file.joinpath(f'{self._temp_out_file.name}{".output" if self._output_file_suffix is None else self._output_file_suffix}')
+        elif output_file.exists() and self._enable_auto_filename:
+            # we'll create iterated filenames until we find one that doesn't exist
+            self.output_file = self._create_autofile(file = output_file)
+        else:
+            self.output_file = output_file
+        # self._write_ready = True
+    
+    def _prepare_file(self):
+        """
+        Function to prepare the file for read/writing.
+        """
+        if not self._read_ready:
+            if self.file:
+                self._temp_src_file.write_bytes(self.file.read_bytes())
+            self._read_ready = True
+        
+    async def _async_prepare_file(self):
+        """
+        Function to prepare the file for read/writing.
+        """
+        if not self._read_ready:
+            if self.file:
+                await self._temp_src_file.async_write_bytes(await self.file.async_read_bytes())
+            self._read_ready = True
+
+    def write_bytes(self, data, flush: Optional[bool] = False, **kwargs):
+        self._temp_out_file.write_bytes(data)
+        if flush: self.flush(**kwargs)
+
+    async def async_write_bytes(self, data: bytes, flush: Optional[bool] = False, **kwargs):
+        await self._temp_out_file.async_write_bytes(data)
+        if flush: await self.async_flush(**kwargs)
+
+    def write_text(self, data, flush: Optional[bool] = False, **kwargs):
+        self._temp_out_file.write_text(data)
+        if flush: self.flush(**kwargs)
+
+    async def async_write_text(self, data: str, flush: Optional[bool] = False, **kwargs):
+        await self._temp_out_file.async_write_text(data, **kwargs)
+        if flush: await self.async_flush(**kwargs)
+
+    def write(self, data: Union[str, bytes], mode: str = 'w', flush: Optional[bool] = False, **kwargs):
+        with self._temp_out_file.open(mode = mode, **kwargs) as f:
+            f.write(data)
+        if flush: self.flush(**kwargs)
+    
+    async def async_write(self, data: Union[str, bytes], mode: str = 'w', flush: Optional[bool] = False, **kwargs):
+        async with self._temp_out_file.async_open(mode = mode, **kwargs) as f:
+            await f.write(data)
+        if flush: await self.async_flush(**kwargs)
+    
+    def read_bytes(self):
+        self._prepare_file()
+        if self.file:
+            return self._temp_src_file.read_bytes()
+        return self._temp_out_file.read_bytes()
+    
+    async def async_read_bytes(self):
+        await self._async_prepare_file()
+        if self.file:
+            return await self._temp_src_file.async_read_bytes()
+        return await self._temp_out_file.async_read_bytes()
+    
+    def read_text(self):
+        self._prepare_file()
+        if self.file:
+            return self._temp_src_file.read_text()
+        return self._temp_out_file.read_text()
+    
+    async def async_read_text(self):
+        await self._async_prepare_file()
+        if self.file:
+            return await self._temp_src_file.async_read_text()
+        return await self._temp_out_file.async_read_text()
+
+    def read(self, mode: str = 'r', **kwargs):
+        self._prepare_file()
+        if self.file:
+            with self._temp_src_file.open(mode = mode, **kwargs) as f:
+                return f.read()
+        with self._temp_out_file.open(mode = mode, **kwargs) as f:
+            return f.read()
+        
+    async def async_read(self, mode: str = 'r', **kwargs):
+        await self._async_prepare_file()
+        async with self._temp_src_file.async_open(mode = mode, **kwargs) as f:
+            return await f.read()
+
+    def open(self, mode: str = 'r', **kwargs):
+        if 'r' in mode and self.file:
+            self._prepare_file()
+            return self._temp_src_file.open(mode = mode, **kwargs)
+        return self._temp_out_file.open(mode = mode, **kwargs)
+
+    def async_open(self, mode: str = 'r', **kwargs) -> IterableAIOFile:
+        if 'r' in mode and self.file:
+            self._prepare_file()
+            # logger.info('Opening: tmp src')
+            return self._temp_src_file.async_open(mode = mode, **kwargs)
+        # logger.info('Opening: tmp out')
+        return self._temp_out_file.async_open(mode = mode, **kwargs)
+
+    @lazyproperty
+    def text(self):
+        """
+        Returns the text of the temp src file
+        """
+        self._prepare_file()
+        if self.file:
+            return self._temp_src_file.read_text()
+        return self._temp_out_file.read_text()
+    
+    @lazyproperty
+    def output_text(self):
+        """
+        Returns the text of the temp out file
+        """
+        if self._closed:
+            if self.output_file:
+                return self.output_file.read_text()
+            raise RuntimeError('Cannot read output text after closing the file, and no output file was provided.')
+        return self._temp_out_file.read_text()
+
+    @lazyproperty
+    def bytes(self):
+        """
+        Returns the bytes of the temp src file
+        """
+        self._prepare_file()
+        if self.file:
+            return self._temp_src_file.read_bytes()
+        return self._temp_out_file.read_bytes()
+    
+    @lazyproperty
+    def output_bytes(self):
+        """
+        Returns the bytes of the temp out file
+        """
+        if self._closed:
+            if self.output_file:
+                return self.output_file.read_bytes()
+            raise RuntimeError('Cannot read output bytes after closing the file, and no output file was provided.')
+        return self._temp_out_file.read_bytes()
+
+    @lazyproperty
+    async def async_text(self):
+        """
+        Returns the text of the temp src file
+        """
+        await self._async_prepare_file()
+        if self.file:
+            return await self._temp_src_file.async_read_text()
+        return await self._temp_out_file.async_read_text()
+    
+    @lazyproperty
+    async def async_output_text(self):
+        """
+        Returns the text of the temp out file
+        """
+        if self._closed:
+            if self.output_file:
+                return await self.output_file.async_read_text()
+            raise RuntimeError('Cannot read output text after closing the file, and no output file was provided.')
+        return await self._temp_out_file.async_read_text()
+
+    @lazyproperty
+    async def async_bytes(self):
+        """
+        Returns the bytes of the temp src file
+        """
+        await self._async_prepare_file()
+        if self.file:
+            return await self._temp_src_file.async_read_bytes()
+        return await self._temp_out_file.async_read_bytes()
+
+    @lazyproperty
+    async def async_output_bytes(self):
+        """
+        Returns the bytes of the temp out file
+        """
+        if self._closed:
+            if self.output_file:
+                return await self.output_file.async_read_bytes()
+            raise RuntimeError('Cannot read output bytes after closing the file, and no output file was provided.')
+        return await self._temp_out_file.async_read_bytes()
+
+    @lazyproperty
+    def path(self):
+        """
+        Returns the path of the temp src file
+        """
+        self._prepare_file()
+        if self.file:
+            return self._temp_src_file.as_posix()
+        return self._temp_out_file.as_posix()
+    
+    @lazyproperty
+    def input_path(self):
+        """
+        Returns the path of the temp src file
+        """
+        if self._closed:
+            raise RuntimeError('File is closed')
+        self._prepare_file()
+        return self._temp_src_file.as_posix()
+    
+    @lazyproperty
+    def read_path(self) -> str:
+        """
+        Returns the path of the temp src file
+        """
+        if self._closed:
+            raise RuntimeError('File is closed')
+        self._prepare_file()
+        return self._temp_src_file.as_posix()
+    
+    @lazyproperty
+    def write_path(self) -> str:
+        """
+        Returns the path of the temp output file
+        """
+        if self._closed:
+            raise RuntimeError('File is closed')
+        return self._temp_out_file.as_posix()
+
+    @lazyproperty
+    def source_path(self):
+        """
+        Returns the path of the temp src file
+        """
+        return self.file.as_posix() if self.file else self._temp_src_file.as_posix()
+
+    @lazyproperty
+    def target_path(self):
+        """
+        Returns the path of the target output file
+        """
+        if self.output_file is None:
+            if self.file and self.file.exists():
+                return (
+                    self.file.as_posix()
+                    if self.overwrite
+                    else self._temp_out_file.as_posix()
+                )
+            return self.file.as_posix()
+        return self.output_file.as_posix()
+
+    def __getattr__(self, name, default: Any = None):
+        self._prepare_file()
+        return getattr(self._temp_src_file, name, default)
+    
+    def __getitem__(self, key):
+        self._prepare_file()
+        return self._temp_src_file[key]
+    
+    def __call__(self, *args, **kwargs):
+        self._prepare_file()
+        return self._temp_src_file(*args, **kwargs)
+
+    def flush(
+        self, 
+        overwrite: Optional[bool] = None, 
+        output_file: Optional[FileLike] = None, 
+        **kwargs
+    ):
+        """
+        Flushes the file to the output file.
+        """
+        if self._closed: 
+            logger.warning('File is closed. Cannot flush.')
+            return
+        overwrite = overwrite or self.overwrite
+        output_file = output_file or self.output_file
+        if output_file is not None:
+            logger.info(f'Writing to output file: {output_file}')
+            output_file.write_bytes(self._temp_out_file.read_bytes())
+        elif self.file and (overwrite or not self.file.exists()):
+            logger.info(f'Writing to input file: {self.file}')
+            self.file.write_bytes(self._temp_out_file.read_bytes())
+    
+    async def async_flush(
+        self, 
+        overwrite: Optional[bool] = None, 
+        output_file: Optional[FileLike] = None, 
+        **kwargs
+    ):
+        """
+        Flushes the file to the output file.
+        """
+        if self._closed: 
+            logger.warning('File is closed. Cannot flush.')
+            return
+        overwrite = overwrite or self.overwrite
+        output_file = output_file or self.output_file
+        if output_file is not None:
+            logger.info(f'Writing to output file: {output_file}')
+            await output_file.async_write_bytes(await self._temp_out_file.async_read_bytes())
+        elif self.file and (overwrite or not self.file.exists()):
+            logger.info(f'Writing to input file: {self.file}')
+            await self.file.async_write_bytes(await self._temp_out_file.async_read_bytes())
+
+
+    def close(self, *args, overwrite: Optional[bool] = None, output_file: Optional[FileLike] = None, **kwargs):
+        if self._closed:
+            return
+        if self._ready:
+            self.flush(overwrite = overwrite, output_file = output_file, **kwargs)
+            self._ready = False        
+        self._temp_src_file.rm_file(missing_ok=True)
+        self._temp_out_file.rm_file(missing_ok=True)
+        self._closed = True
+    
+    async def async_close(self, *args, overwrite: Optional[bool] = None, output_file: Optional[FileLike] = None, **kwargs):
+        if self._closed:
+            return
+        if self._ready:
+            await self.async_flush(overwrite = overwrite, output_file = output_file, **kwargs)
+            self._ready = False
+        
+        await self._temp_src_file.async_rm_file(missing_ok=True)
+        await self._temp_out_file.async_rm_file(missing_ok=True)
+        self._closed = True
+
+    def __enter__(self):
+        self._prepare_file()
+        return self._temp_src_file
+    
+    def __exit__(self, *args):
+        self.close()
+    
+    def _onexit(self, *args, **kwargs):
+        try:
+            self.close()
+        except Exception as e:
+            pass
+            # logger.error(e)
 
 
 
