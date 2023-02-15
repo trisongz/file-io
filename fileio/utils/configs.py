@@ -126,7 +126,7 @@ class AwsSettings(BaseSettings):
             config["secret"] = self.aws_secret_access_key
         if self.aws_access_token:
             config["token"] = self.aws_access_token
-        if not core_settings.boto_config_exists:
+        if not (config.get('key') and config.get('secret')) and not core_settings.boto_config_exists:
             config['anon'] = True
         if self.set_s3_endpoint:
             config['client_kwargs'] = {'endpoint_url': self.s3_endpoint, 'region_name': self.aws_region}
