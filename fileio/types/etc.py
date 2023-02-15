@@ -2,7 +2,7 @@
 import datetime
 import contextlib
 from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from .classprops import lazyproperty
 
 
@@ -465,3 +465,66 @@ class ParsedFile(BaseModel):
     class Config:
         allow_arbitrary_types = True
         extra = 'allow'
+
+
+
+class UniqueFile(BaseModel):
+
+    filename: Optional[str] = Field(None, description = "The filename of the file")
+    checksum: Optional[str] = Field(None, description = "The checksum of the file")
+    checksum_method: Optional[str] = Field(None, description = "The checksum method of the file")
+    mime_type: Optional[str] = Field(None, description = "The mime type of the file")
+    extensions: Optional[Union[List[str], str]] = Field(None, description = "The extensions of the file")
+    size: Optional[int] = Field(None, description = "The size of the file")
+    etag: Optional[str] = Field(None, description = "The etag of the file")
+    last_modified: Optional[datetime.datetime] = Field(None, description = "The last modified date of the file")
+
+    @validator('extensions', pre = True)
+    def _validate_extensions(cls, v):
+        return [v] if isinstance(v, str) else v
+
+    class Config:
+        allow_arbitrary_types = True
+        extra = 'allow'
+    
+    @property
+    def id(self):
+        return self.checksum
+    
+    def __eq__(self, other: Union[str, 'UniqueFile']):
+        """
+        Compare two UniqueFile objects
+        """
+        if isinstance(other, str): return self.id == other
+        return (self.id == other.id and self.checksum_method == other.checksum_method)
+    
+    def __lt__(self, other: Union[int, float, 'UniqueFile']):
+        """
+        Compare two UniqueFile objects based on file size
+        """
+        if isinstance(other, (int, float)): return self.size < other
+        return self.size < other.size
+
+    def __gt__(self, other: Union[int, float, 'UniqueFile']):
+        """
+        Compare two UniqueFile objects based on file size
+        """
+        if isinstance(other, (int, float)): return self.size > other
+        return self.size > other.size
+    
+    def __le__(self, other: Union[int, float, 'UniqueFile']):
+        """
+        Compare two UniqueFile objects based on file size
+        """
+        if isinstance(other, (int, float)): return self.size <= other
+        return self.size <= other.size
+    
+    def __ge__(self, other: Union[int, float, 'UniqueFile']):
+        """
+        Compare two UniqueFile objects based on file size
+        """
+        if isinstance(other, (int, float)): return self.size >= other
+        return self.size >= other.size
+    
+
+

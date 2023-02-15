@@ -1133,7 +1133,8 @@ class FilePath(Path, FilePurePath):
         Return the result of the stat() system call on this path, like
         os.stat() does.
         """
-        return self._accessor.info(self)
+        return get_file_info(self._path)
+        # return self._accessor.info(self._path)
     
     async def async_info(self) -> Dict[str, Any]:
         """

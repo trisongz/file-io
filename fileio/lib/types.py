@@ -474,12 +474,12 @@ class StatelessFile:
         self._closed: bool = False
         atexit.register(self._onexit)
     
-    def _create_autofile(self, file: FileLike, suffix: Optional[str] = None):
+    def _create_autofile(self, file: FileLike, suffix: Optional[str] = None, parent: Optional[FileLike] = None):
         """
         Creates an auto filename for the given file.
         """
         suffix = suffix or self._output_file_suffix or file.suffix
-        file_dir: FileLike = file.parent if file.is_file() else file
+        file_dir: FileLike = parent or (file.parent if file.is_file() else file)
         for i in range(100):
             output_file = file_dir.joinpath(f'{file.stem}_v{str(i).zfill(3)}{suffix}')
             if not output_file.exists():
@@ -498,9 +498,16 @@ class StatelessFile:
                 self.output_file = self._create_autofile(file = self.file)
             return
         output_file = File(output_file)
-        if not output_file.is_file():
+        if output_file.is_dir() and self._enable_auto_filename:
+            self.output_file = self._create_autofile(file = (self.file or output_file), parent = output_file)
+
+        # if output_file.exists() and self._enable_auto_filename:
+        #     # we'll create iterated filenames until we find one that doesn't exist
+        #     self.output_file = self._create_autofile(file = output_file)
+
+        elif not output_file.is_file():
             if self.file and self._enable_auto_filename:
-                self.output_file = self._create_autofile(file = self.file)
+                self.output_file = self._create_autofile(file = self.file, parent = output_file)
             elif self.file:
                 output_file = (
                     output_file.joinpath(
@@ -511,9 +518,6 @@ class StatelessFile:
                 )
             else:
                 self.output_file = output_file.joinpath(f'{self._temp_out_file.name}{".output" if self._output_file_suffix is None else self._output_file_suffix}')
-        elif output_file.exists() and self._enable_auto_filename:
-            # we'll create iterated filenames until we find one that doesn't exist
-            self.output_file = self._create_autofile(file = output_file)
         else:
             self.output_file = output_file
         # self._write_ready = True
