@@ -27,43 +27,95 @@ from fileio.utils.logs import logger
 from fileio.utils.pooler import ThreadPooler
 from typing import Union, Any, TypeVar, List, Optional, Callable, Dict, Type, Tuple, TYPE_CHECKING
 
-
-FileLike = Union[
+PathLikeT = Union[
     Type[FilePurePath],
     Type[FilePath],
     Type[PureFilePosixPath],
     Type[FileWindowsPath],
     Type[FilePosixPath],
-    Type[PureFileWindowsPath],
-    
+    Type[PureFileWindowsPath]
+]
+
+GSPathLikeT = Union[
     Type[FileGSPurePath],
     Type[FileGSPath],
     Type[PureFileGSPosixPath],
     Type[FileGSWindowsPath],
     Type[FileGSPosixPath],
     Type[PureFileGSWindowsPath],
-    
+]
+
+S3PathLikeT = Union[
     Type[FileS3PurePath],
     Type[FileS3Path],
     Type[PureFileS3PosixPath],
     Type[FileS3WindowsPath],
     Type[FileS3PosixPath],
     Type[PureFileS3WindowsPath],
+]
 
+MinioPathLikeT = Union[
     Type[FileMinioPurePath], 
     Type[FileMinioPath], 
     Type[PureFileMinioPosixPath], 
     Type[FileMinioWindowsPath], 
     Type[FileMinioPosixPath], 
     Type[PureFileMinioWindowsPath],
+]
 
+S3CPathLikeT = Union[
     Type[FileS3CPurePath],
     Type[FileS3CPath],
     Type[PureFileS3CPosixPath],
     Type[FileS3CWindowsPath],
     Type[FileS3CPosixPath],
     Type[PureFileS3CWindowsPath],
+]
 
+# FileLike = Union[
+#     Type[FilePurePath],
+#     Type[FilePath],
+#     Type[PureFilePosixPath],
+#     Type[FileWindowsPath],
+#     Type[FilePosixPath],
+#     Type[PureFileWindowsPath],
+    
+#     Type[FileGSPurePath],
+#     Type[FileGSPath],
+#     Type[PureFileGSPosixPath],
+#     Type[FileGSWindowsPath],
+#     Type[FileGSPosixPath],
+#     Type[PureFileGSWindowsPath],
+    
+#     Type[FileS3PurePath],
+#     Type[FileS3Path],
+#     Type[PureFileS3PosixPath],
+#     Type[FileS3WindowsPath],
+#     Type[FileS3PosixPath],
+#     Type[PureFileS3WindowsPath],
+
+#     Type[FileMinioPurePath], 
+#     Type[FileMinioPath], 
+#     Type[PureFileMinioPosixPath], 
+#     Type[FileMinioWindowsPath], 
+#     Type[FileMinioPosixPath], 
+#     Type[PureFileMinioWindowsPath],
+
+#     Type[FileS3CPurePath],
+#     Type[FileS3CPath],
+#     Type[PureFileS3CPosixPath],
+#     Type[FileS3CWindowsPath],
+#     Type[FileS3CPosixPath],
+#     Type[PureFileS3CWindowsPath],
+
+# ]
+
+FileLike = Union[
+    PathLikeT,
+    GSPathLikeT,
+    S3PathLikeT,
+    MinioPathLikeT,
+    S3CPathLikeT,
 ]
 
 _PATHLIKE_CLS: Tuple[FileLike, ...] = (
@@ -761,6 +813,22 @@ class StatelessFile:
                 )
             return self.file.as_posix()
         return self.output_file.as_posix()
+    
+
+    @lazyproperty
+    def target_file(self) -> 'FileLike':
+        """
+        Returns the path of the target output file
+        """
+        if self.output_file is None:
+            if self.file and self.file.exists():
+                return (
+                    self.file
+                    if self.overwrite
+                    else self._temp_out_file
+                )
+            return self.file
+        return self.output_file
 
     def __getattr__(self, name, default: Any = None):
         self._prepare_file()
@@ -851,7 +919,14 @@ class StatelessFile:
         except Exception as e:
             pass
             # logger.error(e)
-
+    
+    def dict(self, *args, **kwargs):
+        # self.flush()
+        return {
+            'input_path': self.input_path,
+            'output_path': self.target_path,
+            'source_path': self.source_path,
+        }
 
 
 __all__ = (

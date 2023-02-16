@@ -451,7 +451,7 @@ class PreparedFile(BaseModel):
 class ParsedFile(BaseModel):
     content: Union[str, Dict[str, Any], Any]
     metadata: Optional[Dict[str, Any]] = {}
-    file: Optional[PreparedFile] = Field(default_factory = PreparedFile)
+    file: Optional[Union[PreparedFile, Any]] = Field(default_factory = PreparedFile)
 
     @lazyproperty
     def file_info(self) -> FileInfo:

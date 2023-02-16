@@ -9,10 +9,10 @@ class Base64GZip(BasePack):
     encoding: str = 'utf-8'
 
     @classmethod
-    def encode(cls, text: str, encoding: str = 'utf-8', *args, **kwargs) -> str:
+    def encode(cls, data: Union[str, bytes], encoding: str = 'utf-8', *args, **kwargs) -> str:
+        if isinstance(data, str): data = data.encode(encoding = encoding)
         return base64.b64encode(
-            gzip.compress(
-                text.encode(encoding = encoding), *args, **kwargs)
+            gzip.compress(data, *args, **kwargs)
             ).decode(encoding = encoding)
 
     @classmethod
@@ -23,7 +23,7 @@ class Base64GZip(BasePack):
         ).decode(encoding = encoding)
 
     @classmethod
-    def dumps(cls, data: str, encoding: str = 'utf-8', *args, **kwargs) -> str:
+    def dumps(cls, data: Union[str, bytes], encoding: str = 'utf-8', *args, **kwargs) -> str:
         return cls.encode(data, encoding = encoding, *args, **kwargs)
     
     @classmethod
