@@ -183,6 +183,8 @@ def freeze_args_and_kwargs(*args, **kwargs):
     kwargs = {k: recursive_freeze(v) if isinstance(v, dict) else v for k, v in kwargs.items()}
     return args, kwargs
 
+
+
 def timed_cache(
     secs: typing.Optional[int] = 60 * 60, 
     maxsize: int = 1024
@@ -204,11 +206,14 @@ def timed_cache(
                 func.expiration = create_timestamp() + func.lifetime
 
         if is_coro_func(func):
+            # https://stackoverflow.com/questions/34116942/how-to-cache-asyncio-coroutines
             @functools.wraps(func)
-            async def wrapped_func(*args, **kwargs):
+            def wrapped_func(*args, **kwargs):
                 _check_cache(func)
                 args, kwargs = freeze_args_and_kwargs(*args, **kwargs)
-                return await func(*args, **kwargs)
+                coro = func(*args, **kwargs)
+                return asyncio.ensure_future(coro)
+                # return await func(*args, **kwargs)
             return wrapped_func
 
         else:

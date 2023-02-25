@@ -378,7 +378,7 @@ class FilePath(Path, FilePurePath):
         """
         Returns the path of the file.
         """
-        from fileio.core.generic import get_path
+        from fileio.lib.types import get_path
         return get_path(path)
     
     def open(self, mode: FileMode = 'r', buffering: int = -1, encoding: Optional[str] = DEFAULT_ENCODING, errors: Optional[str] = ON_ERRORS, newline: Optional[str] = NEWLINE, **kwargs) -> IO[Union[str, bytes]]:
