@@ -89,7 +89,7 @@ class CloudFileSystemType(type):
                 
         boto_config = BotoConfig(
             signature_version = settings.minio.minio_signature_ver,
-            max_pool_connections = settings.core.max_workers * 2
+            max_pool_connections = settings.core.num_workers * 2
         )
         cls.boto = boto3.client(
             's3', 
@@ -101,7 +101,113 @@ class CloudFileSystemType(type):
         )
         transfer_config = s3transfer.TransferConfig(
             use_threads = True,
-            max_concurrency = settings.core.max_workers
+            max_concurrency = settings.core.num_workers
+        )
+        def create_s3t(self):
+            return s3transfer.create_transfer_manager(cls.boto, transfer_config)
+        
+        cls.s3t = create_s3t
+
+    def build_s3c(cls, **auth_config):
+        LazyLib.import_lib('s3fs')
+        LazyLib.import_lib('boto3')
+        
+        import s3fs
+        import boto3
+        import boto3.s3.transfer as s3transfer
+        from botocore.config import Config as BotoConfig
+
+        if auth_config: settings.s3_compat.update_auth(**auth_config)
+        config = settings.s3_compat.build_s3fs_config()
+
+        cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
+        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+                
+        boto_config = BotoConfig(
+            signature_version = settings.s3_compat.s3_compat_signature_ver,
+            max_pool_connections = settings.core.num_workers * 2
+        )
+        cls.boto = boto3.client(
+            's3', 
+            region_name = settings.s3_compat.s3_compat_region, 
+            endpoint_url = settings.s3_compat.s3_compat_endpoint, 
+            aws_access_key_id = settings.s3_compat.s3_compat_access_key, 
+            aws_secret_access_key = settings.s3_compat.s3_compat_secret_key, 
+            config = boto_config
+        )
+        transfer_config = s3transfer.TransferConfig(
+            use_threads = True,
+            max_concurrency = settings.core.num_workers
+        )
+        def create_s3t(self):
+            return s3transfer.create_transfer_manager(cls.boto, transfer_config)
+        
+        cls.s3t = create_s3t
+
+
+    def build_r2(cls, **auth_config):
+        LazyLib.import_lib('s3fs')
+        LazyLib.import_lib('boto3')
+        
+        import s3fs
+        import boto3
+        import boto3.s3.transfer as s3transfer
+        from botocore.config import Config as BotoConfig
+
+        if auth_config: settings.r2.update_auth(**auth_config)
+        config = settings.r2.build_s3fs_config()
+        cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
+        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+                
+        boto_config = BotoConfig(
+            max_pool_connections = settings.core.num_workers * 2
+        )
+        cls.boto = boto3.client(
+            's3', 
+            # region_name = "auto", 
+            endpoint_url = settings.r2.r2_endpoint, 
+            aws_access_key_id = settings.r2.r2_access_key_id, 
+            aws_secret_access_key = settings.r2.r2_secret_access_key, 
+            config = boto_config
+        )
+        transfer_config = s3transfer.TransferConfig(
+            use_threads = True,
+            max_concurrency = settings.core.num_workers
+        )
+        def create_s3t(self):
+            return s3transfer.create_transfer_manager(cls.boto, transfer_config)
+        
+        cls.s3t = create_s3t
+    
+
+    def build_wasabi(cls, **auth_config):
+        LazyLib.import_lib('s3fs')
+        LazyLib.import_lib('boto3')
+        
+        import s3fs
+        import boto3
+        import boto3.s3.transfer as s3transfer
+        from botocore.config import Config as BotoConfig
+
+        if auth_config: settings.wasabi.update_auth(**auth_config)
+        config = settings.wasabi.build_s3fs_config()
+        cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
+        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+                
+        boto_config = BotoConfig(
+            max_pool_connections = settings.core.num_workers * 2
+        )
+        cls.boto = boto3.client(
+            's3', 
+            region_name = settings.wasabi.wasabi_region, 
+            endpoint_url = settings.wasabi.wasabi_endpoint, 
+            aws_access_key_id = settings.wasabi.wasabi_access_key_id, 
+            aws_secret_access_key = settings.wasabi.wasabi_secret_access_key, 
+            config = boto_config
+        )
+        transfer_config = s3transfer.TransferConfig(
+            use_threads = True,
+            max_concurrency = settings.core.num_workers
         )
         def create_s3t(self):
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
@@ -127,7 +233,12 @@ class CloudFileSystemType(type):
             self.build_minio(**auth_config)
         elif self.fs_name == 'gcsfs':
             self.build_gcsfs(**auth_config)
-        
+        elif self.fs_name == 's3c':
+            self.build_s3c(**auth_config)
+        elif self.fs_name == 'r2':
+            self.build_r2(**auth_config)
+        elif self.fs_name == 'wasabi':
+            self.build_wasabi(**auth_config)
         # atexit.register(cls.close_filesystems)
 
 

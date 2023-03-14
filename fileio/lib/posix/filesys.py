@@ -66,8 +66,20 @@ class S3Compat_CloudFileSystem(metaclass=CloudFileSystemType):
     #     )
     #     # self.fs.s3.close()
     #     # self.fsa.s3.close()
-    
 
+class R2_CloudFileSystem(metaclass=CloudFileSystemType):
+    fs: 's3fs.S3FileSystem' = None
+    fsa: 's3fs.S3FileSystem' = None
+    fs_name: str = 'r2'
+    boto: 'boto3.session.Session' = None
+    s3t: Callable = None
+
+class Wasabi_CloudFileSystem(metaclass=CloudFileSystemType):
+    fs: 's3fs.S3FileSystem' = None
+    fsa: 's3fs.S3FileSystem' = None
+    fs_name: str = 'wasabi'
+    boto: 'boto3.session.Session' = None
+    s3t: Callable = None
 
 
 # class HF_CloudFileSystem(metaclass=CloudFileSystemType):
@@ -110,6 +122,23 @@ class S3Compat_Accessor(BaseAccessor):
 #     class CloudFileSystem(HF_CloudFileSystem):
 #         pass
 
+class R2_Accessor(BaseAccessor):
+    """
+    R2 Filelike Accessor that inherits from BaseAccessor
+    """
+    class CloudFileSystem(R2_CloudFileSystem):
+        pass
+
+
+class Wasabi_Accessor(BaseAccessor):
+    """
+    Wasabi Filelike Accessor that inherits from BaseAccessor
+    """
+    class CloudFileSystem(Wasabi_CloudFileSystem):
+        pass
+
+
+
 
 AccessorLike = Union[
     BaseAccessor,
@@ -118,6 +147,8 @@ AccessorLike = Union[
     Minio_Accessor,
     S3Compat_Accessor,
     # HF_Accessor,
+    R2_Accessor,
+    Wasabi_Accessor,
 ]
 
 CloudFileSystemLike = Union[
@@ -127,6 +158,8 @@ CloudFileSystemLike = Union[
     Minio_CloudFileSystem,
     S3Compat_CloudFileSystem,
     # HF_CloudFileSystem,
+    R2_CloudFileSystem,
+    Wasabi_CloudFileSystem,
 ]
 
 class AccessorMeta(type):
@@ -141,9 +174,11 @@ class AccessorMeta(type):
         'minio': Minio_CloudFileSystem,
         's3c': S3Compat_CloudFileSystem,
         # 'hf': HF_CloudFileSystem,
+        'r2': R2_CloudFileSystem,
+        'wsbi': Wasabi_CloudFileSystem,
     }
 
-    @classmethod
+    # @classmethod
     def get_gs_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> GCP_Accessor:
         if not cls.ax.get('gs') or _reset:
             GCP_CloudFileSystem.build_filesystems(**kwargs)
@@ -151,7 +186,7 @@ class AccessorMeta(type):
             cls.ax['gs'] = GCP_Accessor()
         return cls.ax['gs']
     
-    @classmethod
+    # @classmethod
     def get_s3_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> AWS_Accessor:
         if not cls.ax.get('s3') or _reset:
             AWS_CloudFileSystem.build_filesystems(**kwargs)
@@ -160,7 +195,7 @@ class AccessorMeta(type):
             # atexit.register(AWS_CloudFileSystem._onexit)
         return cls.ax['s3']
     
-    @classmethod
+    # @classmethod
     def get_minio_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> Minio_Accessor:
         if not cls.ax.get('minio') or _reset:
             Minio_CloudFileSystem.build_filesystems(**kwargs)
@@ -168,7 +203,7 @@ class AccessorMeta(type):
             cls.ax['minio'] = Minio_Accessor()
         return cls.ax['minio']
     
-    @classmethod
+    # @classmethod
     def get_s3c_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> S3Compat_Accessor:
         if not cls.ax.get('s3c') or _reset:
             S3Compat_CloudFileSystem.build_filesystems(**kwargs)
@@ -176,7 +211,24 @@ class AccessorMeta(type):
             cls.ax['s3c'] = S3Compat_Accessor()
         return cls.ax['s3c']
 
-    @classmethod
+    # @classmethod
+    def get_r2_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> R2_Accessor:
+        if not cls.ax.get('r2') or _reset:
+            R2_CloudFileSystem.build_filesystems(**kwargs)
+            R2_Accessor.reload_cfs(**kwargs)
+            cls.ax['r2'] = R2_Accessor()
+        return cls.ax['r2']
+
+
+    def get_wsbi_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> Wasabi_Accessor:
+        if not cls.ax.get('wsbi') or _reset:
+            Wasabi_CloudFileSystem.build_filesystems(**kwargs)
+            Wasabi_Accessor.reload_cfs(**kwargs)
+            cls.ax['wsbi'] = Wasabi_Accessor()
+        return cls.ax['wsbi']
+
+
+    # @classmethod
     def get_accessor(
         cls, 
         name: str, 
@@ -189,7 +241,7 @@ class AccessorMeta(type):
         _ax = getattr(cls, f'get_{name}_accessor', None)
         return _ax(_reset=_reset, **kwargs) if _ax else BaseAccessor
     
-    @classmethod
+    # @classmethod
     def get_fs(
         cls, 
         name: str, 

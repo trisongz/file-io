@@ -10,8 +10,8 @@ if TYPE_CHECKING:
     from fileio.lib.base import FilePath
 
 GIT_PREFIXES = ('gh://', 'git://', 'hf://')
-URI_PREFIXES = ('gs://', 's3://', 'az://', 'minio://', 'mio://', 's3c://') + GIT_PREFIXES
-_URI_SCHEMES = frozenset(('gs', 's3', 'az', 'minio', 'mio', 's3c', 'gh', 'git', 'hf'))
+URI_PREFIXES = ('gs://', 's3://', 'az://', 'minio://', 'mio://', 's3c://', 'r2://', 'wsbi://') + GIT_PREFIXES
+_URI_SCHEMES = frozenset(('gs', 's3', 'az', 'minio', 'mio', 's3c', 'r2', 'wsbi', 'gh', 'git', 'hf'))
 _URI_MAP_ROOT = {
     'gs://': '/gs/',
     's3://': '/s3/',
@@ -21,7 +21,9 @@ _URI_MAP_ROOT = {
     's3c://': '/s3c/',
     'gh://': '/github/',
     'git://': '/git/',
-    'hf://': '/huggingface/'
+    'hf://': '/huggingface/',
+    'r2://': '/r2/',
+    'wsbi://': '/wasabi/',
 }
 _PROVIDER_MAP = {
     'gs': 'GoogleCloudStorage',
@@ -32,7 +34,8 @@ _PROVIDER_MAP = {
     's3c': 'S3Compatible',
     'gh': 'Github',
     'git': 'Git',
-    'hf': 'HuggingFace'
+    'hf': 'HuggingFace',
+    'r2': 'CloudFlare',
 }
 
 Paths = Union['FilePath', Path, str]

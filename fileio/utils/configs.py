@@ -2,7 +2,7 @@ import os
 import json
 import pathlib
 import multiprocessing as mp
-from pydantic import BaseSettings, validator
+from pydantic import BaseSettings, validator, root_validator
 
 from typing import Optional, Dict, Any, Union
 from fileio.utils.logs import default_logger as logger
@@ -462,6 +462,156 @@ class HuggingfaceSettings(BaseSettings):
             else:
                 setattr(self, k, v)
 
+
+class CloudflareR2Settings(BaseSettings):
+    r2_account_id: Optional[str] = None
+    r2_access_key_id: Optional[str] = None
+    r2_secret_access_key: Optional[str] = None
+    r2_access_token: Optional[str] = None
+
+    r2_endpoint: Optional[str] = None
+    r2_config: Optional[Union[str, Dict[str, Any]]] = None
+
+    class Config:
+        env_prefix: str = ""
+
+    @root_validator(pre=True)
+    def build_valid_values(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate the values and build the valid values dict"""
+        if values.get("r2_config") is not None:
+            values["r2_config"] = json.loads(values["r2_config"]) if isinstance(values["r2_config"], str) else values["r2_config"]
+        if values.get("r2_endpoint") is not None:
+            values["r2_endpoint"] = values["r2_endpoint"].rstrip("/")
+            if not values["r2_endpoint"].startswith("http"):
+                values["r2_endpoint"] =  "https://" + values["r2_endpoint"]
+        elif values.get("r2_account_id"):
+            values["r2_endpoint"] = f"https://{values['r2_account_id']}.r2.cloudflarestorage.com"
+        return values
+
+
+    def set_env(self):
+        if self.r2_endpoint:
+            os.environ["R2_ENDPOINT"] = self.r2_endpoint
+        if self.r2_account_id:
+            os.environ["R2_ACCOUNT_ID"] = self.r2_account_id
+        if self.r2_access_key_id:
+            os.environ["R2_ACCESS_KEY_ID"] = self.r2_access_key_id
+        if self.r2_secret_access_key:
+            os.environ["R2_SECRET_ACCESS_KEY"] = self.r2_secret_access_key
+        if self.r2_access_token:
+            os.environ["R2_ACCESS_TOKEN"] = str(self.r2_access_token)
+
+    def update_config(self, **kwargs):
+        for k, v in kwargs.items():
+            if not hasattr(self, k): continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
+
+    def update_auth(self, **config):
+        self.update_config(**config)
+        self.set_env()
+    
+
+    def build_s3fs_config(self) -> Dict[str, Any]:
+        """
+        Builds the s3fs config dict
+        """
+        config = {
+            "client_kwargs": {
+                "endpoint_url": self.r2_endpoint,
+                "region_name": "auto",
+            },
+            "config_kwargs": {}
+        }
+        if self.r2_access_key_id:
+            config["key"] = self.r2_access_key_id
+        if self.r2_secret_access_key:
+            config["secret"] = self.r2_secret_access_key
+        if self.r2_access_token:
+            config["token"] = self.r2_access_token
+        if self.r2_config:
+            config["config_kwargs"].update(self.r2_config)
+        return config
+    
+
+class WasabiS3Settings(BaseSettings):
+
+    wasabi_access_key_id: Optional[str] = None
+    wasabi_secret_access_key: Optional[str] = None
+    wasabi_access_token: Optional[str] = None
+
+    wasabi_region: Optional[str] = 'us-east-1'
+
+    wasabi_endpoint: Optional[str] = None
+    wasabi_config: Optional[Union[str, Dict[str, Any]]] = None
+
+    class Config:
+        env_prefix: str = ""
+
+    @root_validator(pre=True)
+    def build_valid_values(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate the values and build the valid values dict"""
+        if values.get("wasabi_config") is not None:
+            values["wasabi_config"] = json.loads(values["wasabi_config"]) if isinstance(values["wasabi_config"], str) else values["wasabi_config"]
+        if values.get("wasabi_endpoint") is not None:
+            values["wasabi_endpoint"] = values["wasabi_endpoint"].rstrip("/")
+            if not values["wasabi_endpoint"].startswith("http"):
+                values["wasabi_endpoint"] =  "https://" + values["wasabi_endpoint"]
+        else:
+            values["wasabi_endpoint"] = f"https://s3.{values['wasabi_region']}.wasabisys.com" if values.get("wasabi_region", "") != "us-east-1" else \
+                "https://s3.wasabisys.com"
+        return values
+
+
+    def update_config(self, **kwargs):
+        for k, v in kwargs.items():
+            if not hasattr(self, k): continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
+
+    def update_auth(self, **config):
+        self.update_config(**config)
+        self.set_env()
+    
+
+    def set_env(self):
+        if self.wasabi_endpoint:
+            os.environ["WASABI_ENDPOINT"] = self.wasabi_endpoint
+        if self.wasabi_access_key_id:
+            os.environ["WASABI_ACCESS_KEY_ID"] = self.wasabi_access_key_id
+        if self.wasabi_secret_access_key:
+            os.environ["WASABI_SECRET_ACCESS_KEY"] = self.wasabi_secret_access_key
+        if self.wasabi_access_token:
+            os.environ["WASABI_ACCESS_TOKEN"] = self.wasabi_access_token
+        if self.wasabi_region:
+            os.environ["WASABI_REGION"] = self.wasabi_region
+
+    def build_s3fs_config(self) -> Dict[str, Any]:
+        """
+        Builds the s3fs config dict
+        """
+        config = {
+            "client_kwargs": {
+                "endpoint_url": self.wasabi_endpoint,
+                "region_name": self.wasabi_region,
+            },
+            "config_kwargs": {}
+        }
+        if self.wasabi_access_key_id:
+            config["key"] = self.wasabi_access_key_id
+        if self.wasabi_secret_access_key:
+            config["secret"] = self.wasabi_secret_access_key
+        if self.wasabi_access_token:
+            config["token"] = self.wasabi_access_token
+        if self.wasabi_config:
+            config["config_kwargs"].update(self.wasabi_config)
+        return config
+
+
 class Settings(BaseSettings):
 
     read_chunk_size: Optional[int] = 1024 * 64 # 64KB
@@ -491,6 +641,14 @@ class Settings(BaseSettings):
     @lazyproperty
     def s3_compat(self) -> S3CompatSettings:
         return S3CompatSettings()
+    
+    @lazyproperty
+    def r2(self) -> CloudflareR2Settings:
+        return CloudflareR2Settings()
+    
+    @lazyproperty
+    def wasabi(self) -> WasabiS3Settings:
+        return WasabiS3Settings()
     
     @lazyproperty
     def github(self) -> GithubSettings:
@@ -555,6 +713,8 @@ class Settings(BaseSettings):
         self.s3_compat.set_env()
         # self.github.set_env()
         # self.huggingface.set_env()
+        self.r2.set_env()
+        self.wasabi.set_env()
 
     def update_auth(self, update_fs: bool = True, **config):
         self.update_config(**config)
@@ -573,7 +733,19 @@ class Settings(BaseSettings):
             if config.get('minio'):
                 FileSysManager.get_accessor('minio', _reset = True)
                 # get_accessor('minio', _reset = True)
+            
+            if config.get('s3_compat') or config.get('s3c'):
+                FileSysManager.get_accessor('s3c', _reset = True)
+                # get_accessor('s3_compat', _reset = True)
+            
+            if config.get('r2'):
+                FileSysManager.get_accessor('r2', _reset = True)
+                # get_accessor('r2', _reset = True)
+
+            if config.get('wasabi'):
+                FileSysManager.get_accessor('wasabi', _reset = True)
     
+
     class Config(BaseSettings.Config):
         env_prefix = "FILEIO_"
         case_sensitive = False

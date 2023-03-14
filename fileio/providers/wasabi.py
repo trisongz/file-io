@@ -2,17 +2,17 @@ from __future__ import annotations
 import os
 
 from fileio.lib.posix.base import *
-from fileio.lib.posix.filesys import S3Compat_CloudFileSystem
+from fileio.lib.posix.filesys import Wasabi_CloudFileSystem
 from fileio.lib.posix.cloud import *
 
-class FileS3CPurePath(CloudFileSystemPurePath):
-    _prefix: str = 's3c'
-    _provider: str = 'S3Compatible'
-    _win_pathz: ClassVar = 'PureFileS3CWindowsPath'
-    _posix_pathz: ClassVar = 'PureFileS3CPosixPath'
+class FileWasabiPurePath(CloudFileSystemPurePath):
+    _prefix: str = 'wsbi'
+    _provider: str = 'Wasabi'
+    _win_pathz: ClassVar = 'PureFileWasabiWindowsPath'
+    _posix_pathz: ClassVar = 'PureFileWasabiPosixPath'
 
 
-class PureFileS3CPosixPath(PureCloudFileSystemPosixPath):
+class PureFileWasabiPosixPath(PureCloudFileSystemPosixPath):
     """PurePath subclass for non-Windows systems.
     On a POSIX system, instantiating a PurePath should return this object.
     However, you can also instantiate it directly on any system.
@@ -22,7 +22,7 @@ class PureFileS3CPosixPath(PureCloudFileSystemPosixPath):
     __slots__ = ()
 
 
-class PureFileS3CWindowsPath(PureCloudFileSystemWindowsPath):
+class PureFileWasabiWindowsPath(PureCloudFileSystemWindowsPath):
     """PurePath subclass for Windows systems.
     On a Windows system, instantiating a PurePath should return this object.
     However, you can also instantiate it directly on any system.
@@ -31,27 +31,27 @@ class PureFileS3CWindowsPath(PureCloudFileSystemWindowsPath):
     _pathlike = ntpath
     __slots__ = ()
 
-class FileS3CPath(CloudFileSystemPath):
+class FileWasabiPath(CloudFileSystemPath):
     """
     Our customized class that incorporates both sync and async methods
     """
     _flavour = _pathz_windows_flavour if os.name == 'nt' else _pathz_posix_flavour
     _accessor: AccessorLike = None
     _pathlike = posixpath
-    _prefix = 's3c'
-    _provider = 'S3Compatible'
+    _prefix = 'wsbi'
+    _provider = 'Wasabi'
 
-    _win_pathz: ModuleType = 'FileS3CWindowsPath'
-    _posix_pathz: ModuleType = 'FileS3CPosixPath'
+    _win_pathz: ModuleType = 'FileWasabiWindowsPath'
+    _posix_pathz: ModuleType = 'FileWasabiPosixPath'
 
-    def _init(self, template: Optional['FileS3CPath'] = None):
+    def _init(self, template: Optional['FileWasabiPath'] = None):
         self._accessor: AccessorLike = FileSysManager.get_accessor(self._prefix)
         # self._accessor: AccessorLike = get_accessor(self._prefix)
         self._closed = False
         self._fileio = None
 
     def __new__(cls, *parts, **kwargs):
-        if cls is FileS3CPath or issubclass(cls, FileS3CPath): 
+        if cls is FileWasabiPath or issubclass(cls, FileWasabiPath): 
             cls = cls._win_pathz if os.name == 'nt' else cls._posix_pathz
             cls = globals()[cls]
         self = cls._from_parts(parts, init=False)
@@ -65,7 +65,7 @@ class FileS3CPath(CloudFileSystemPath):
     # Implement some stuff that boto is faster in
     def upload_file(self, dest: PathLike, filename: Optional[str] = None, overwrite: bool = True, **kwargs):
         """
-        Upload a file to S3C
+        Upload a file to Wasabi
 
         Utilize boto3
         """
@@ -88,7 +88,7 @@ class FileS3CPath(CloudFileSystemPath):
         **kwargs
         ):
         """
-        Downloads a file from S3C to a path
+        Downloads a file from Wasabi to a path
         """
         assert output_file or output_dir, "Must provide either output_file or output_dir"
         output_file = output_file or output_dir.joinpath(filename or self.name)
@@ -105,7 +105,7 @@ class FileS3CPath(CloudFileSystemPath):
 
     async def async_upload_file(self, dest: PathLike, filename: Optional[str] = None,  overwrite: bool = True, **kwargs):
         """
-        Upload a file to S3C
+        Upload a file to Wasabi
 
         Utilize boto3
         """
@@ -183,34 +183,34 @@ class FileS3CPath(CloudFileSystemPath):
 
 
 
-class FileS3CPosixPath(PosixPath, FileS3CPath, PureFileS3CPosixPath):
+class FileWasabiPosixPath(PosixPath, FileWasabiPath, PureFileWasabiPosixPath):
     __slots__ = ()
 
 
-class FileS3CWindowsPath(WindowsPath, FileS3CPath, PureFileS3CWindowsPath):
+class FileWasabiWindowsPath(WindowsPath, FileWasabiPath, PureFileWasabiWindowsPath):
     __slots__ = ()
 
     def is_mount(self) -> int:
-        raise NotImplementedError("FileS3CPath.is_mount() is unsupported on this system")
+        raise NotImplementedError("FileWasabiPath.is_mount() is unsupported on this system")
 
     async def async_is_mount(self) -> int:
-        raise NotImplementedError("FileS3CPath.async_is_mount() is unsupported on this system")
+        raise NotImplementedError("FileWasabiPath.async_is_mount() is unsupported on this system")
 
 register_pathlike(
     [
-        FileS3CPurePath, FileS3CPath, PureFileS3CPosixPath, FileS3CWindowsPath, FileS3CPosixPath, PureFileS3CWindowsPath
+        FileWasabiPurePath, FileWasabiPath, PureFileWasabiPosixPath, FileWasabiWindowsPath, FileWasabiPosixPath, PureFileWasabiWindowsPath
     ]
 )
 
-S3CFileSystem = S3Compat_CloudFileSystem
+WasabiFileSystem = Wasabi_CloudFileSystem
 
 
 __all__ = (
-    'FileS3CPurePath',
-    'FileS3CPath',
-    'PureFileS3CPosixPath',
-    'FileS3CWindowsPath',
-    'FileS3CPosixPath',
-    'PureFileS3CWindowsPath',
-    'S3CFileSystem'
+    'FileWasabiPurePath',
+    'FileWasabiPath',
+    'PureFileWasabiPosixPath',
+    'FileWasabiWindowsPath',
+    'FileWasabiPosixPath',
+    'PureFileWasabiWindowsPath',
+    'WasabiFileSystem'
 )

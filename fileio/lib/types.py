@@ -15,6 +15,8 @@ from fileio.providers.gcs import *
 from fileio.providers.s3 import *
 from fileio.providers.minio import *
 from fileio.providers.s3c import *
+from fileio.providers.r2 import *
+from fileio.providers.wasabi import *
 
 from fileio.lib.apis import (
     FastUploadFile,
@@ -72,6 +74,26 @@ S3CPathLikeT = Union[
     Type[PureFileS3CWindowsPath],
 ]
 
+
+R2PathLikeT = Union[
+    Type[FileR2PurePath],
+    Type[FileR2Path],
+    Type[PureFileR2PosixPath],
+    Type[FileR2WindowsPath],
+    Type[FileR2PosixPath],
+    Type[PureFileR2WindowsPath],
+]
+
+WasabiPathLikeT = Union[
+    Type[FileWasabiPurePath],
+    Type[FileWasabiPath],
+    Type[PureFileWasabiPosixPath],
+    Type[FileWasabiWindowsPath],
+    Type[FileWasabiPosixPath],
+    Type[PureFileWasabiWindowsPath],
+]
+
+
 # FileLike = Union[
 #     Type[FilePurePath],
 #     Type[FilePath],
@@ -116,6 +138,8 @@ FileLike = Union[
     S3PathLikeT,
     MinioPathLikeT,
     S3CPathLikeT,
+    R2PathLikeT,
+    WasabiPathLikeT,
 ]
 
 _PATHLIKE_CLS: Tuple[FileLike, ...] = (
@@ -153,6 +177,18 @@ _PATHLIKE_CLS: Tuple[FileLike, ...] = (
     FileS3CWindowsPath,
     FileS3CPosixPath,
     PureFileS3CWindowsPath,
+
+    FileR2PurePath,
+    FileR2Path,
+    PureFileR2PosixPath,
+    FileR2WindowsPath,
+    FileR2PosixPath,
+
+    FileWasabiPurePath,
+    FileWasabiPath,
+    PureFileWasabiPosixPath,
+    FileWasabiWindowsPath,
+    FileWasabiPosixPath,
 )
 
 FileSysLike = Union[
@@ -160,6 +196,8 @@ FileSysLike = Union[
     Type[GCPFileSystem],
     Type[MinioFileSystem],
     Type[S3CFileSystem],
+    Type[R2FileSystem],
+    Type[WasabiFileSystem],
 ]
 
 PathLike = Union[str, os.PathLike, FileLike]
@@ -209,6 +247,8 @@ _PREFIXES_TO_CLS: Dict[str, FileLike] = {
     's3c://': FileS3CPath,
     #'minio://': cloud.PosixMinioPath,
     #'s3compat://': cloud.PosixS3CompatPath,
+    'r2://': FileR2Path,
+    'wsbi://': FileWasabiPath,
 }
 
 
