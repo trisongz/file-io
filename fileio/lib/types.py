@@ -30,6 +30,13 @@ from fileio.utils.pooler import ThreadPooler
 from typing import Union, Any, TypeVar, List, Optional, Callable, Dict, Type, Tuple, TYPE_CHECKING
 
 PathLikeT = Union[
+    FilePurePath,
+    FilePath,
+    PureFilePosixPath,
+    FileWindowsPath,
+    FilePosixPath,
+    PureFileWindowsPath,
+    
     Type[FilePurePath],
     Type[FilePath],
     Type[PureFilePosixPath],
@@ -131,16 +138,17 @@ WasabiPathLikeT = Union[
 #     Type[PureFileS3CWindowsPath],
 
 # ]
+FileLike = PathLikeT
 
-FileLike = Union[
-    PathLikeT,
-    GSPathLikeT,
-    S3PathLikeT,
-    MinioPathLikeT,
-    S3CPathLikeT,
-    R2PathLikeT,
-    WasabiPathLikeT,
-]
+# FileLike = Union[
+#     PathLikeT,
+#     GSPathLikeT,
+#     S3PathLikeT,
+#     MinioPathLikeT,
+#     S3CPathLikeT,
+#     R2PathLikeT,
+#     WasabiPathLikeT,
+# ]
 
 _PATHLIKE_CLS: Tuple[FileLike, ...] = (
     FilePurePath,

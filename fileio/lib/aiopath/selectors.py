@@ -105,8 +105,8 @@ class _WildcardSelector(_AsyncSelector):
                 if self.match(name):
                     path = parent_path._make_child_relpath(name)
 
-                async for p in self.successor._select_from(path, is_dir, exists, scandir):
-                    yield p
+                    async for p in self.successor._select_from(path, is_dir, exists, scandir):
+                        yield p
         except PermissionError:
             return
 
