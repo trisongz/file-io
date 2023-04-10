@@ -549,16 +549,16 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             # could give priority to other errors like EACCES or EROFS
             if not exist_ok or not self.is_dir(): raise
 
-    async def async_mkdir(self, parents: bool = True, exist_ok: bool = True):
+    async def async_mkdir(self, parents: bool = True, exist_ok: bool = True, **kwargs):
         """
         Create a new directory at this given path.
         """
-        try: await self._accessor.async_mkdir(self._cloudpath, create_parents = parents, exist_ok = exist_ok)
+        try: await self._accessor.async_mkdir(self._cloudpath, create_parents = parents, exist_ok = exist_ok, **kwargs)
 
         except FileNotFoundError:
             if not parents or self.parent == self: raise
-            await self.parent.async_mkdir(parents=True, exist_ok=True)
-            await self.async_mkdir(parents=False, exist_ok=exist_ok)
+            await self.parent.async_mkdir(parents=True, exist_ok=True, **kwargs)
+            await self.async_mkdir(parents=False, exist_ok=exist_ok, **kwargs)
 
         except OSError:
             # Cannot rely on checking for EEXIST, since the operating system
