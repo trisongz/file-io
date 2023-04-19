@@ -3,7 +3,7 @@ from typing import Dict, Any, Union, List, Sequence, Generator, Iterator, Iterab
 from .base import BasePack
 
 if TYPE_CHECKING:
-    from fileio.core.types import FileLike
+    from fileio.lib.types import FileLike
 
 class Tsv(BasePack):
 
@@ -25,7 +25,7 @@ class Tsv(BasePack):
         write_header: bool = True,
         **kwargs
     ) -> 'FileLike':
-        from fileio import File
+        from fileio.lib.types import File
         file = File(path)
         with file.open(mode = mode, newline = newline, buffering = buffering, encoding = encoding) as f:
             fieldnames = fieldnames if fieldnames is not None else data[0].keys()
@@ -61,7 +61,7 @@ class Tsv(BasePack):
         lineterminator: bool = '\n',
         **kwargs
     ) -> csv.DictReader:
-        from fileio import File
+        from fileio.lib.types import File
         return csv.DictReader(
             File(path).open(mode = mode, newline = newline, buffering = buffering, encoding = encoding), 
             fieldnames = fieldnames, 
@@ -89,7 +89,7 @@ class Tsv(BasePack):
         lineterminator: bool = '\n',
         **kwargs
     ) -> Generator[Dict, None, None]:
-        from fileio import File
+        from fileio.lib.types import File
         file = File(path)
         with file.open(mode = mode, newline = newline, buffering = buffering, encoding = encoding) as f:
             yield from csv.DictReader(

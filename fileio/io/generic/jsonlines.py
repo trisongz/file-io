@@ -5,7 +5,7 @@ from typing import Dict, Any, Union, List, Type, Generator, Optional, TYPE_CHECK
 from ._json import ObjectEncoder
 
 if TYPE_CHECKING:
-    from fileio.core.types import FileLike
+    from fileio.lib.types import FileLike
 
 class JsonLines:
 
@@ -38,7 +38,7 @@ class JsonLines:
         Iterates through data and dumps each item to a new line in a file.
         mode = 'auto' will automatically determine to use append or write if the file exists or not.
         """
-        from fileio import File, FileLike
+        from fileio.lib.types import File, FileLike
         file: FileLike  = File(path)
         if mode == 'auto': mode = 'a' if file.exists() else 'w'
         n = 0
@@ -65,7 +65,7 @@ class JsonLines:
         Iterates through data and dumps each item to a new line in a file.
         mode = 'auto' will automatically determine to use append or write if the file exists or not.
         """
-        from fileio import File, FileLike
+        from fileio.lib.types import File, FileLike
         file: FileLike = File(path)
         if mode == 'auto': mode = 'a' if await file.async_exists() else 'w'
         n = 0
@@ -103,7 +103,7 @@ class JsonLines:
         assert data is not None or path is not None, 'Either data or path must be provided.'
         if data is not None:
             yield from JsonLines.load_data(data, **kwargs)
-        from fileio import File
+        from fileio.lib.types import File
         file = File(path)
         with file.open(mode = mode, newline = newline, buffering = buffering, encoding = encoding) as f:
             for line in f:
@@ -125,7 +125,7 @@ class JsonLines:
         assert data is not None or path is not None, 'Either data or path must be provided.'
         if data is not None:
             yield JsonLines.load_data(data, **kwargs)
-        from fileio import File
+        from fileio.lib.types import File
         file = File(path)
         async with file.async_open(mode = mode, newline = newline, buffering = buffering, encoding = encoding) as f:
             for line in f:

@@ -444,6 +444,41 @@ class File:
         # return Dill.loads(await _file.async_read_bytes())
     
     @classmethod
+    async def async_load_csv(
+        cls, 
+        *args, 
+        file: Union[FileLike, Any] = None, 
+        csv_args: Dict[str, Any] = None,
+        **kwargs
+    ) -> Any:
+        _file = get_filelike(*args, **kwargs) if file is None else file
+        if csv_args is None: csv_args = {}
+        from fileio.io import Csv
+        return await ThreadPooler.run_async(
+            Csv.load,
+            _file,
+            **csv_args
+        )
+
+    @classmethod
+    async def async_load_tsv(
+        cls, 
+        *args, 
+        file: Union[FileLike, Any] = None, 
+        tsv_args: Dict[str, Any] = None,
+        **kwargs
+    ) -> Any:
+        _file = get_filelike(*args, **kwargs) if file is None else file
+        if tsv_args is None: tsv_args = {}
+        from fileio.io import Tsv
+        return await ThreadPooler.run_async(
+            Tsv.load,
+            _file,
+            **tsv_args
+        )
+
+    
+    @classmethod
     async def async_load_file(
         cls, 
         *args, 
@@ -466,6 +501,10 @@ class File:
             return await cls.async_load_pickle(file = _file)
         if _file.extension in {'.txt', '.text'}:
             return await cls.async_load_text(file = _file)
+        if _file.extension in {'.csv'}:
+            return await cls.async_load_csv(file = _file)
+        if _file.extension in {'.tsv'}:
+            return await cls.async_load_tsv(file = _file)
         raise ValueError(f'Unknown file extension: {_file.extension}')
     
     @classmethod
@@ -512,6 +551,32 @@ class File:
         return Dill.loads(_file.read_bytes())
     
     @classmethod
+    def load_csv(
+        cls, 
+        *args, 
+        file: Union[FileLike, Any] = None, 
+        csv_args: Dict[str, Any] = None,
+        **kwargs
+    ) -> Any:
+        _file = get_filelike(*args, **kwargs) if file is None else file
+        if csv_args is None: csv_args = {}
+        from fileio.io import Csv
+        return Csv.load(_file, **csv_args)
+
+    @classmethod
+    def load_tsv(
+        cls, 
+        *args, 
+        file: Union[FileLike, Any] = None, 
+        tsv_args: Dict[str, Any] = None,
+        **kwargs
+    ) -> Any:
+        _file = get_filelike(*args, **kwargs) if file is None else file
+        if tsv_args is None: tsv_args = {}
+        from fileio.io import Tsv
+        return Tsv.load(_file, **tsv_args)
+
+    @classmethod
     def load_file(
         cls, 
         *args, 
@@ -532,6 +597,10 @@ class File:
             return cls.load_pickle(file = _file)
         if _file.extension in {'.txt', '.text'}:
             return cls.load_text(file = _file)
+        if _file.extension in {'.csv'}:
+            return cls.load_csv(file = _file)
+        if _file.extension in {'.tsv'}:
+            return cls.load_tsv(file = _file)
         raise ValueError(f'Unknown file extension: {_file.extension}')
         
 
