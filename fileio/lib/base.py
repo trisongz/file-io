@@ -5,7 +5,7 @@ import tempfile
 from stat import S_ISDIR, S_ISLNK, S_ISREG, S_ISSOCK, S_ISBLK, S_ISCHR, S_ISFIFO
 from typing import ClassVar
 from hashlib import md5
-
+from pydantic.types import ByteSize
 from fileio.types.common import *
 from fileio.types.classprops import lazyproperty
 from fileio.lib.core import *
@@ -13,6 +13,7 @@ from fileio.lib.aiopath.selectors import _make_selector
 from fileio.lib.aiopath.scandir import EntryWrapper, scandir_async, _scandir_results
 from fileio.lib.flavours import _pathz_windows_flavour, _pathz_posix_flavour
 from fileio.utils import get_file_info
+import fileio.lib.exceptions as exceptions
 
 def scandir_sync(*args, **kwargs) -> Iterable[EntryWrapper]:
     yield from _scandir_results(*args, **kwargs)
@@ -41,11 +42,14 @@ class _FileAccessor(NormalAccessor):
     # Sync methods
     stat = os.stat
     info = get_file_info
+    size = os.path.getsize
+    walk = os.walk
 
     lstat = os.lstat
     open = os.open
     listdir = os.listdir
     chmod = os.chmod
+    is_dir = os.path.isdir
 
     copy = shutil.copy
     copy_file = shutil.copyfile
@@ -53,11 +57,14 @@ class _FileAccessor(NormalAccessor):
     # Async Methods
     async_stat = func_as_method_coro(os.stat)
     async_info = func_as_method_coro(get_file_info)
+    async_size = func_as_method_coro(os.path.getsize)
+    async_walk = func_as_method_coro(os.walk)
 
     async_lstat = func_as_method_coro(os.lstat)
     async_open = func_as_method_coro(os.open)
     async_listdir = func_as_method_coro(os.listdir)
     async_chmod = func_as_method_coro(os.chmod)
+    async_is_dir = func_as_method_coro(os.path.isdir)
 
     async_copy = func_as_method_coro(shutil.copy)
     async_copy_file = func_as_method_coro(shutil.copyfile)
@@ -272,8 +279,7 @@ class FilePath(Path, FilePurePath):
         """
         Returns the filename if is file, else ''
         """
-        if self.is_file(): return self.parts[-1]
-        return ''
+        return self.parts[-1] if self.is_file() else ''
 
     @property
     def ext_(self) -> str:
@@ -672,7 +678,7 @@ class FilePath(Path, FilePurePath):
         
         if dest.exists() and not overwrite and dest.is_file():
             if skip_errors: return dest
-            raise Exception(f'File {dest._path} exists')
+            raise exceptions.FileExistsError(f'File {dest._path} exists')
 
         if not dest.is_cloud:
             self._accessor.copy(self._path, dest._path, **kwargs)
@@ -687,7 +693,7 @@ class FilePath(Path, FilePurePath):
         
         if await dest.async_exists() and not overwrite and await dest.async_is_file():
             if skip_errors: return dest
-            raise Exception(f'File {dest._path} exists')
+            exceptions.FileExistsError(f'File {dest._path} exists')
 
         if not dest.is_cloud:
             await self._accessor.async_copy(self._path, dest._path, **kwargs)
@@ -702,7 +708,7 @@ class FilePath(Path, FilePurePath):
         
         if dest.exists() and not overwrite and dest.is_file():
             if skip_errors: return dest
-            raise Exception(f'File {dest._path} exists')
+            raise exceptions.FileExistsError(f'File {dest._path} exists')
 
         if not dest.is_cloud:
             self._accessor.copy_file(self._path, dest._path, **kwargs)
@@ -717,7 +723,7 @@ class FilePath(Path, FilePurePath):
         
         if await dest.async_exists() and not overwrite and await dest.async_is_file():
             if skip_errors: return dest
-            raise Exception(f'File {dest._path} exists')
+            raise exceptions.FileExistsError(f'File {dest._path} exists')
 
         if not dest.is_cloud:
             await self._accessor.async_copy_file(self._path, dest._path, **kwargs)
@@ -729,15 +735,14 @@ class FilePath(Path, FilePurePath):
         """
         Remove this file or dir
         """
-        if self.is_dir(): return self.rmdir(**kwargs)
-        
-        return self._accessor.remove(self)
+        return self.rmdir(**kwargs) if self.is_dir() \
+            else self._accessor.remove(self)
     
     async def async_rm(self, **kwargs):
         """
         Remove this file or dir
         """
-        if self.async_is_dir(): return await self.async_rmdir(**kwargs)
+        if await self.async_is_dir(): return await self.async_rmdir(**kwargs)
         await self._accessor.async_remove(self)
 
     def rm_file(self, **kwargs):
@@ -1005,6 +1010,37 @@ class FilePath(Path, FilePurePath):
         for name in await self._accessor.async_listdir(self):
             if name in {'.', '..'}: continue
             yield self._make_child_relpath(name)
+        
+    def walk(self) -> Iterable[Tuple[FilePath, List[FilePath], List[FilePath]]]:
+        """Iterate over this subtree and yield a 3-tuple (dirpath, dirnames,
+        filenames) for each directory in the subtree rooted at path
+        (including path itself, if it is a directory).
+        """
+        top = self._make_child_relpath('.')
+        dirs, nondirs = [], []
+        for name in self._accessor.listdir(self):
+            if name in {'.', '..'}: continue
+            (dirs if self._accessor.is_dir(self._make_child_relpath(name)) else nondirs).append(name)
+        yield top, dirs, nondirs
+        for name in dirs:
+            new_path = self._make_child_relpath(name)
+            yield from new_path.walk()
+        
+    async def async_walk(self) -> AsyncIterable[Tuple[FilePath, List[FilePath], List[FilePath]]]:
+        """Iterate over this subtree and yield a 3-tuple (dirpath, dirnames,
+        filenames) for each directory in the subtree rooted at path
+        (including path itself, if it is a directory).
+        """
+        top = self._make_child_relpath('.')
+        dirs, nondirs = [], []
+        for name in await self._accessor.async_listdir(self):
+            if name in {'.', '..'}: continue
+            (dirs if await self._accessor.async_is_dir(self._make_child_relpath(name)) else nondirs).append(name)
+        yield top, dirs, nondirs
+        for name in dirs:
+            new_path = self._make_child_relpath(name)
+            async for path in new_path.async_walk():
+                yield path
 
     def glob(self, pattern: str) -> List[FilePath]:
         """Iterate over this subtree and yield all existing files (of any
@@ -1142,6 +1178,30 @@ class FilePath(Path, FilePurePath):
         os.stat() does.
         """
         return await self._accessor.async_info(self)
+    
+    def size(self) -> int:
+        """
+        Return the size of the file in bytes, reported by os.path.getsize().
+        """
+        return self._accessor.size(self)
+
+    async def async_size(self) -> int:
+        """
+        Return the size of the file in bytes, reported by os.path.getsize().
+        """
+        return await self._accessor.async_size(self)
+    
+    def bytesize(self) -> ByteSize:
+        """
+        Return the size of the file in bytes, reported by os.path.getsize().
+        """
+        return ByteSize.validate(self.size())
+    
+    async def async_bytesize(self) -> ByteSize:
+        """
+        Return the size of the file in bytes, reported by os.path.getsize().
+        """
+        return ByteSize.validate(await self.async_size())
 
     def lstat(self) -> stat_result:
         """
@@ -1273,7 +1333,7 @@ class FilePath(Path, FilePurePath):
         """
         # Need to exist and be a dir
         if not self.exists() or not self.is_dir(): return False
-        
+
         try:
             parent_stat = self.parent.stat()
             parent_dev = parent_stat.st_dev
@@ -1281,10 +1341,8 @@ class FilePath(Path, FilePurePath):
 
         stat = self.stat()
         dev = stat.st_dev
-        if dev != parent_dev: return True
-        ino = stat.st_ino
-        parent_ino = parent_stat.st_ino
-        return ino == parent_ino
+        return True if dev != parent_dev \
+            else stat.st_ino == parent_stat.st_ino
 
     async def async_is_mount(self) -> bool:
         """
@@ -1292,7 +1350,7 @@ class FilePath(Path, FilePurePath):
         """
         # Need to exist and be a dir
         if not await self.async_exists() or not await self.async_is_dir(): return False
-        
+
         try:
             parent_stat = await self.parent.async_stat()
             parent_dev = parent_stat.st_dev
@@ -1300,10 +1358,8 @@ class FilePath(Path, FilePurePath):
 
         stat = await self.async_stat()
         dev = stat.st_dev
-        if dev != parent_dev: return True
-        ino = stat.st_ino
-        parent_ino = parent_stat.st_ino
-        return ino == parent_ino
+        return True if dev != parent_dev \
+            else stat.st_ino == parent_stat.st_ino
 
     def is_block_device(self) -> bool:
         """

@@ -13,6 +13,9 @@ if TYPE_CHECKING:
         import s3fs
     with contextlib.suppress(ImportError):
         import boto3
+    with contextlib.suppress(ImportError):
+        import adlfs
+
     # with contextlib.suppress(ImportError):
     #     from fileio.providers.hffs.filesys import HfFileSystem
 
@@ -81,6 +84,10 @@ class Wasabi_CloudFileSystem(metaclass=CloudFileSystemType):
     boto: 'boto3.session.Session' = None
     s3t: Callable = None
 
+class Azure_CloudFileSystem(metaclass=CloudFileSystemType):
+    fs: 'adlfs.AzureBlobFileSystem' = None
+    fsa: 'adlfs.AzureBlobFileSystem' = None
+    fs_name: str = 'azure'
 
 # class HF_CloudFileSystem(metaclass=CloudFileSystemType):
 #     fs: 'HfFileSystem' = None
@@ -138,7 +145,12 @@ class Wasabi_Accessor(BaseAccessor):
         pass
 
 
-
+class Azure_Accessor(BaseAccessor):
+    """
+    Azure Filelike Accessor that inherits from BaseAccessor
+    """
+    class CloudFileSystem(Azure_CloudFileSystem):
+        pass
 
 AccessorLike = Union[
     BaseAccessor,
@@ -149,6 +161,7 @@ AccessorLike = Union[
     # HF_Accessor,
     R2_Accessor,
     Wasabi_Accessor,
+    Azure_Accessor,
 ]
 
 CloudFileSystemLike = Union[
@@ -160,6 +173,7 @@ CloudFileSystemLike = Union[
     # HF_CloudFileSystem,
     R2_CloudFileSystem,
     Wasabi_CloudFileSystem,
+    Azure_CloudFileSystem,
 ]
 
 class AccessorMeta(type):
@@ -176,9 +190,10 @@ class AccessorMeta(type):
         # 'hf': HF_CloudFileSystem,
         'r2': R2_CloudFileSystem,
         'wsbi': Wasabi_CloudFileSystem,
+        'az': Azure_CloudFileSystem,
+
     }
 
-    # @classmethod
     def get_gs_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> GCP_Accessor:
         if not cls.ax.get('gs') or _reset:
             GCP_CloudFileSystem.build_filesystems(**kwargs)
@@ -186,7 +201,6 @@ class AccessorMeta(type):
             cls.ax['gs'] = GCP_Accessor()
         return cls.ax['gs']
     
-    # @classmethod
     def get_s3_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> AWS_Accessor:
         if not cls.ax.get('s3') or _reset:
             AWS_CloudFileSystem.build_filesystems(**kwargs)
@@ -195,7 +209,6 @@ class AccessorMeta(type):
             # atexit.register(AWS_CloudFileSystem._onexit)
         return cls.ax['s3']
     
-    # @classmethod
     def get_minio_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> Minio_Accessor:
         if not cls.ax.get('minio') or _reset:
             Minio_CloudFileSystem.build_filesystems(**kwargs)
@@ -203,7 +216,6 @@ class AccessorMeta(type):
             cls.ax['minio'] = Minio_Accessor()
         return cls.ax['minio']
     
-    # @classmethod
     def get_s3c_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> S3Compat_Accessor:
         if not cls.ax.get('s3c') or _reset:
             S3Compat_CloudFileSystem.build_filesystems(**kwargs)
@@ -211,7 +223,6 @@ class AccessorMeta(type):
             cls.ax['s3c'] = S3Compat_Accessor()
         return cls.ax['s3c']
 
-    # @classmethod
     def get_r2_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> R2_Accessor:
         if not cls.ax.get('r2') or _reset:
             R2_CloudFileSystem.build_filesystems(**kwargs)
@@ -219,16 +230,20 @@ class AccessorMeta(type):
             cls.ax['r2'] = R2_Accessor()
         return cls.ax['r2']
 
-
     def get_wsbi_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> Wasabi_Accessor:
         if not cls.ax.get('wsbi') or _reset:
             Wasabi_CloudFileSystem.build_filesystems(**kwargs)
             Wasabi_Accessor.reload_cfs(**kwargs)
             cls.ax['wsbi'] = Wasabi_Accessor()
         return cls.ax['wsbi']
+    
+    def get_az_accessor(cls, _reset: Optional[bool] = False, **kwargs) -> Azure_Accessor:
+        if not cls.ax.get('az') or _reset:
+            Azure_CloudFileSystem.build_filesystems(**kwargs)
+            Azure_Accessor.reload_cfs(**kwargs)
+            cls.ax['az'] = Azure_Accessor()
+        return cls.ax['az']
 
-
-    # @classmethod
     def get_accessor(
         cls, 
         name: str, 
@@ -241,7 +256,7 @@ class AccessorMeta(type):
         _ax = getattr(cls, f'get_{name}_accessor', None)
         return _ax(_reset=_reset, **kwargs) if _ax else BaseAccessor
     
-    # @classmethod
+
     def get_fs(
         cls, 
         name: str, 
@@ -251,10 +266,9 @@ class AccessorMeta(type):
         """
         Returns a file system for the given file system name
         """
-        _fs: CloudFileSystemLike = cls.fs_map.get(name, None)
+        _fs: CloudFileSystemLike = cls.fs_map.get(name)
         if not _fs: return CloudFileSystemType
-        if _reset:
-            _fs.build_filesystems(**kwargs)
+        if _reset: _fs.build_filesystems(**kwargs)
         return _fs
         
 

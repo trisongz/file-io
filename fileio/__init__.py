@@ -31,7 +31,19 @@ from .lib.types import (
 # )
 from .utils import settings
 
-
+__all__ = [
+    'pathlib',
+    'File',
+    'FileLike',
+    'FileType',
+    'FileListType',
+    'PathLike',
+    'FileSysLike',
+    'FileInfo',
+    'PreparedFile',
+    'ParsedFile',
+    'settings',
+]
 # from fileio.core.imports import pathlib
 # from fileio.core.generic import *
 

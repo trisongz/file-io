@@ -6,17 +6,17 @@ import datetime
 
 from typing import ClassVar
 from fsspec.callbacks import Callback
-
+from pydantic.types import ByteSize
 from fileio.lib.aiopath.wrap import to_thread
 from fileio.lib.flavours import _pathz_windows_flavour, _pathz_posix_flavour
 
 from fileio.lib.posix.base import *
 from fileio.lib.posix.filesys import AccessorLike, CloudFileSystemLike, FileSysManager
-
+import fileio.lib.exceptions as exceptions
 from fileio.utils import logger
 
 if TYPE_CHECKING:
-    from fileio.lib.types import PathLike
+    from fileio.lib.types import PathLike, FileLike
     # from fileio.core.generic import PathLike
 
 
@@ -839,11 +839,26 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
 
         return os.path.samestat(await self.async_stat(),other_st)
 
+    def listdir(self) -> List[Type['CloudFileSystemPath']]:
+        """Return a list of the entries in the directory (as returned by
+        os.listdir()).
+        """
+        # return self._accessor.listdir(self._cloudpath)
+        return [self._make_child_relpath(name) for name in self._accessor.listdir(self._cloudpath)]
+
+    async def async_listdir(self) -> List[Type['CloudFileSystemPath']]:
+        """Return a list of the entries in the directory (as returned by
+        os.listdir()).
+        """
+        return [self._make_child_relpath(name) for name in await self._accessor.async_listdir(self._cloudpath)]
+        # return [self._make_child_relpath(name) for name in await self._accessor.async_listdir(self._cloudstr)]
+
+
     def iterdir(self) -> Iterable[Type['CloudFileSystemPath']]:
         """Iterate over the files in this directory.  Does not yield any
         result for the special paths '.' and '..'.
         """
-        for name in self._accessor.listdir(self):
+        for name in self._accessor.listdir(self._cloudpath):
             if name in {'.', '..'}: continue
             yield self._make_child_relpath(name)
 
@@ -852,9 +867,41 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         result for the special paths '.' and '..'.
         """
         # for name in await self._accessor.async_listdir(self):
-        async for name in self._accessor.async_listdir(self):
+        async for name in self._accessor.async_listdir(self._cloudpath):
             if name in {'.', '..'}: continue
             yield self._make_child_relpath(name)
+    
+
+    def walk(self) -> Iterable[Tuple['CloudFileSystemPath', List['CloudFileSystemPath'], List['CloudFileSystemPath']]]:
+        """Iterate over this subtree and yield a 3-tuple (dirpath, dirnames,
+        filenames) for each directory in the subtree rooted at path
+        (including path itself, if it is a directory).
+        """
+        top = self._make_child_relpath('.')
+        dirs, nondirs = [], []
+        for name in self._accessor.listdir(self._cloudpath):
+            if name in {'.', '..'}: continue
+            (dirs if self._accessor.is_dir(self._make_child_relpath(name)) else nondirs).append(self._make_child_relpath(name))
+        yield top, dirs, nondirs
+        for name in dirs:
+            new_path = self._make_child_relpath(name)
+            yield from new_path.walk()
+        
+    async def async_walk(self) -> AsyncIterable[Tuple['CloudFileSystemPath', List['CloudFileSystemPath'], List['CloudFileSystemPath']]]:
+        """Iterate over this subtree and yield a 3-tuple (dirpath, dirnames,
+        filenames) for each directory in the subtree rooted at path
+        (including path itself, if it is a directory).
+        """
+        top = self._make_child_relpath('.')
+        dirs, nondirs = [], []
+        for name in await self._accessor.async_listdir(self._cloudpath):
+            if name in {'.', '..'}: continue
+            (dirs if await self._accessor.async_is_dir(self._make_child_relpath(name)) else nondirs).append(self._make_child_relpath(name))
+        yield top, dirs, nondirs
+        for name in dirs:
+            new_path = self._make_child_relpath(name)
+            async for path in new_path.async_walk():
+                yield path
 
     def glob(self, pattern: str = '*', as_path: bool = True) -> Iterable[Union[str, Type['CloudFileSystemPath']]]:
         """Iterate over this subtree and yield all existing files (of any
@@ -1093,6 +1140,30 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         return await self._accessor.async_info(self._cloudpath)
 
+    def size(self) -> int:
+        """
+        Return the size of the file, reported by os.path.getsize.
+        """
+        return self._accessor.size(self._cloudpath)
+
+    async def async_size(self) -> int:
+        """
+        Return the size of the file, reported by os.path.getsize.
+        """
+        return await self._accessor.async_size(self._cloudpath)
+
+    def bytesize(self) -> ByteSize:
+        """
+        Return the size of the file in bytes, reported by os.path.getsize().
+        """
+        return ByteSize.validate(self.size())
+    
+    async def async_bytesize(self) -> ByteSize:
+        """
+        Return the size of the file in bytes, reported by os.path.getsize().
+        """
+        return ByteSize.validate(await self.async_size())
+
     def lstat(self) -> stat_result:
         """
         Like stat(), except if the path points to a symlink, the symlink's
@@ -1172,14 +1243,14 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         return await self._accessor.async_is_file(self._cloudpath)
 
     @staticmethod
-    def _get_pathlike(path: 'PathLike'):
+    def _get_pathlike(path: 'FileLike') -> 'FileLike':
         """
         Returns the path of the file.
         """
-        from fileio.core.generic import get_path
-        return get_path(path)
+        from fileio.lib.types import File
+        return File(path)
 
-    def copy(self, dest: 'PathLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
+    def copy(self, dest: 'FileLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
         """
         Copies the File to the Dir/File.
         """
@@ -1188,12 +1259,12 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             dest = dest.joinpath(self.filename_)
         if dest.exists() and not overwrite and dest.is_file():
             if skip_errors: return dest
-            raise ValueError(f'File {dest._path} exists')
+            raise exceptions.FileExistsError(f'File {dest._path} exists')
         if dest.is_cloud: self._accessor.copy(self._path, dest._path, recursive)
         else: self._accessor.get(self._path, dest._path, recursive)
         return dest
 
-    async def async_copy(self, dest: 'PathLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
+    async def async_copy(self, dest: 'FileLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
         """
         Copies the File to the Dir/File.
         """
@@ -1202,12 +1273,12 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             dest = dest.joinpath(self.filename_)
         if await dest.async_exists() and not overwrite and await dest.async_is_file():
             if skip_errors: return dest
-            raise ValueError(f'File {dest._path} exists')
+            raise exceptions.FileExistsError(f'File {dest._path} exists')
         if dest.is_cloud: await self._accessor.async_copy(self._cloudpath, dest._cloudpath, recursive = recursive)
         else: await self._accessor.async_get(self._cloudpath, dest.string, recursive = recursive)
         return dest
 
-    def copy_file(self, dest: 'PathLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
+    def copy_file(self, dest: 'FileLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
         """
         Copies this File to the the Dest Path
         """
@@ -1216,12 +1287,12 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             dest = dest.joinpath(self.filename_)
         if dest.exists() and not overwrite and dest.is_file():
             if skip_errors: return dest
-            raise ValueError(f'File {dest._path} exists')
+            raise exceptions.FileExistsError(f'File {dest._path} exists')
         if dest.is_cloud: self._accessor.copy(self._path, dest._path, recursive)
         else: self._accessor.get(self._path, dest._path, recursive)
         return dest
 
-    async def async_copy_file(self, dest: 'PathLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
+    async def async_copy_file(self, dest: 'FileLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
         """
         Copies this File to the the Dest Path
         """
@@ -1230,12 +1301,12 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             dest = dest.joinpath(self.filename_)
         if await dest.async_exists() and not overwrite and await dest.async_is_file():
             if skip_errors: return dest
-            raise ValueError(f'File {dest._path} exists')
+            raise exceptions.FileExistsError(f'File {dest._path} exists')
         if dest.is_cloud: await self._accessor.async_copy(self._cloudpath, dest._cloudpath, recursive = recursive)
         else: await self._accessor.async_get(self._cloudpath, dest.string, recursive = recursive)
         return dest
 
-    def put(self, src: 'PathLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
+    def put(self, src: 'FileLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy file(s) from src to this FilePath
         WIP support for cloud-to-cloud
@@ -1244,7 +1315,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.put(src.string, self._cloudpath, recursive=recursive, callback=callback, **kwargs)
 
-    async def async_put(self, src: 'PathLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
+    async def async_put(self, src: 'FileLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy file(s) from src to this FilePath
         WIP support for cloud-to-cloud
@@ -1253,7 +1324,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return await self._accessor.async_put(src.string, self._cloudpath, recursive=recursive, callback=callback, **kwargs)
 
-    def put_file(self, src: 'PathLike', callback: Optional[Callable] = Callback(), **kwargs):
+    def put_file(self, src: 'FileLike', callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy single file to remote
         WIP support for cloud-to-cloud
@@ -1262,7 +1333,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.put_file(src.string, self._cloudpath, callback=callback, **kwargs)
 
-    async def async_put_file(self, src: 'PathLike', callback: Optional[Callable] = Callback(), **kwargs):
+    async def async_put_file(self, src: 'FileLike', callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy single file to remote
         WIP support for cloud-to-cloud
@@ -1271,7 +1342,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not src.is_cloud, 'Cloud to Cloud support not supported at this time'
         return await self._accessor.async_put_file(src.string, self._cloudpath, callback=callback, **kwargs)
 
-    def get(self, dest: 'PathLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
+    def get(self, dest: 'FileLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy the remote file(s) to dest (local)
         WIP support for cloud-to-cloud
@@ -1280,7 +1351,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not dest.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.get(self._cloudpath, dest.string, recursive=recursive, callback=callback, **kwargs)
 
-    async def async_get(self, dest: 'PathLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
+    async def async_get(self, dest: 'FileLike', recursive: bool = False, callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copy the remote file(s) to dest (local)
         WIP support for cloud-to-cloud
@@ -1289,7 +1360,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not dest.is_cloud, 'Cloud to Cloud support not supported at this time'
         return await self._accessor.async_get(self._cloudpath, dest.string, recursive=recursive, callback=callback, **kwargs)
 
-    def get_file(self, dest: 'PathLike', callback: Optional[Callable] = Callback(), **kwargs):
+    def get_file(self, dest: 'FileLike', callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copies this file to dest (local)
         WIP support for cloud-to-cloud
@@ -1298,7 +1369,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         assert not dest.is_cloud, 'Cloud to Cloud support not supported at this time'
         return self._accessor.get_file(self._cloudpath, dest.string, callback=callback, **kwargs)
 
-    async def async_get_file(self, dest: 'PathLike', callback: Optional[Callable] = Callback(), **kwargs):
+    async def async_get_file(self, dest: 'FileLike', callback: Optional[Callable] = Callback(), **kwargs):
         """
         Copies this file to dest (local)
         WIP support for cloud-to-cloud

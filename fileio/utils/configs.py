@@ -70,7 +70,7 @@ class AwsSettings(BaseSettings):
     aws_access_key_id: Optional[str] = None
     aws_secret_access_key: Optional[str] = None
     aws_region: Optional[str] = "us-east-1"
-    set_s3_endpoint: Optional[bool] = True
+    set_s3_endpoint: Optional[bool] = False
     s3_config: Optional[Union[str, Dict[str, Any]]] = None
 
     class Config:
@@ -111,9 +111,8 @@ class AwsSettings(BaseSettings):
         self.set_env()
 
         if update_fs:
-            # Reset the accessor to use the new settings
-            from fileio.lib.posix.filesys import get_accessor
-            get_accessor('s3', _reset=True)
+            from fileio.lib.posix.filesys import FileSysManager
+            FileSysManager.get_accessor('s3', _reset=True)
 
     def build_s3fs_config(self) -> Dict[str, Any]:
         """
@@ -122,8 +121,10 @@ class AwsSettings(BaseSettings):
         config = {}
         if self.aws_access_key_id:
             config["key"] = self.aws_access_key_id
+            # config['aws_access_key_id'] = self.aws_access_key_id
         if self.aws_secret_access_key:
             config["secret"] = self.aws_secret_access_key
+            # config['aws_secret_access_key'] = self.aws_secret_access_key
         if self.aws_access_token:
             config["token"] = self.aws_access_token
         if not (config.get('key') and config.get('secret')) and not core_settings.boto_config_exists:
@@ -201,8 +202,8 @@ class GcpSettings(BaseSettings):
 
         if update_fs:
             # Reset the accessor to use the new settings
-            from fileio.lib.posix.filesys import get_accessor
-            get_accessor('gs', _reset=True)
+            from fileio.lib.posix.filesys import FileSysManager
+            FileSysManager.get_accessor('gs', _reset=True)
 
     
 
@@ -252,8 +253,8 @@ class MinioSettings(BaseSettings):
         self.set_env()
 
         # Reset the accessor to use the new settings
-        from fileio.lib.posix.filesys import get_accessor
-        get_accessor('minio', _reset=True)
+        from fileio.lib.posix.filesys import FileSysManager
+        FileSysManager.get_accessor('minio', _reset=True)
     
     def build_s3fs_config(self) -> Dict[str, Any]:
         """
@@ -347,6 +348,79 @@ class S3CompatSettings(BaseSettings):
         return config
 
 
+class AzureSettings(BaseSettings):
+    azure_account_name: Optional[str] = None
+    azure_account_key: Optional[str] = None
+    azure_sas_token: Optional[str] = None
+    azure_connection_string: Optional[str] = None
+    azure_blocksize: Optional[int] = None
+    azure_client_id: Optional[str] = None
+    azure_client_secret: Optional[str] = None
+    azure_tenant_id: Optional[str] = None
+    azure_version_aware: Optional[bool] = False
+
+    azure_secure: Optional[bool] = True
+    azure_config: Optional[Union[str, Dict[str, Any]]] = None
+    azure_socket_timeout: Optional[int] = None
+
+    class Config:
+        env_prefix: str = ""
+
+    @validator("azure_config")
+    def validate_azure_config(cls, v) -> Dict:
+        if v is None: return {}
+        return json.loads(v) if isinstance(v, str) else v
+    
+    def set_env(self):
+        if self.azure_account_name:
+            os.environ["AZURE_STORAGE_ACCOUNT_NAME"] = self.azure_account_name
+        if self.azure_account_key:
+            os.environ["AZURE_STORAGE_ACCOUNT_KEY"] = self.azure_account_key
+        if self.azure_sas_token:
+            os.environ["AZURE_STORAGE_SAS_TOKEN"] = self.azure_sas_token
+        if self.azure_connection_string:
+            os.environ["AZURE_STORAGE_CONNECTION_STRING"] = self.azure_connection_string
+        if self.azure_client_id:
+            os.environ["AZURE_STORAGE_CLIENT_ID"] = self.azure_client_id
+        if self.azure_client_secret:
+            os.environ["AZURE_STORAGE_CLIENT_SECRET"] = self.azure_client_secret
+        if self.azure_tenant_id:
+            os.environ["AZURE_STORAGE_TENANT_ID"] = self.azure_tenant_id
+        
+
+    def update_config(self, **kwargs):
+        for k, v in kwargs.items():
+            if not hasattr(self, k): continue
+            if isinstance(getattr(self, k), pathlib.Path):
+                setattr(self, k, pathlib.Path(v))
+            else:
+                setattr(self, k, v)
+
+    def update_auth(self, **config):
+        self.update_config(**config)
+        self.set_env()
+    
+    def build_azurefs_config(self) -> Dict[str, Any]:
+        """
+        Builds the azurefs config dict
+        """
+        config = {
+            "account_name": self.azure_account_name,
+            "account_key": self.azure_account_key,
+            "sas_token": self.azure_sas_token,
+            "secure": self.azure_secure,
+            "connection_string": self.azure_connection_string,
+            "blocksize": self.azure_blocksize,
+            "client_id": self.azure_client_id,
+            "client_secret": self.azure_client_secret,
+            "tenant_id": self.azure_tenant_id,
+            "version_aware": self.azure_version_aware,
+            "socket_timeout": self.azure_socket_timeout,
+        }
+        config = {k: v for k, v in config.items() if v is not None}
+        if self.azure_config:
+            config.update(self.azure_config)
+        return config
 
 class GithubSettings(BaseSettings):
     github_org: Optional[str] = None
@@ -633,7 +707,11 @@ class Settings(BaseSettings):
     @lazyproperty
     def gcp(self) -> GcpSettings:
         return GcpSettings()
-    
+
+    @lazyproperty
+    def azure(self) -> AzureSettings:
+        return AzureSettings()
+
     @lazyproperty
     def minio(self) -> MinioSettings:
         return MinioSettings()

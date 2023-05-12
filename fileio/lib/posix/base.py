@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 GIT_PREFIXES = ('gh://', 'git://', 'hf://')
 URI_PREFIXES = ('gs://', 's3://', 'az://', 'minio://', 'mio://', 's3c://', 'r2://', 'wsbi://') + GIT_PREFIXES
-_URI_SCHEMES = frozenset(('gs', 's3', 'az', 'minio', 'mio', 's3c', 'r2', 'wsbi', 'gh', 'git', 'hf'))
+_URI_SCHEMES = frozenset(('gs', 's3', 'az', 'minio', 'mio', 's3c', 'r2', 'wsbi', 'az', 'gh', 'git', 'hf'))
 _URI_MAP_ROOT = {
     'gs://': '/gs/',
     's3://': '/s3/',

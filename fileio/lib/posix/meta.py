@@ -24,7 +24,6 @@ class CloudFileSystemType(type):
 
     #s3t: 'boto3.s3.transfer.TransferManager' = None
 
-    @classmethod
     def is_ready(cls):
         return bool(cls.fsa and cls.fs)
     
@@ -44,7 +43,6 @@ class CloudFileSystemType(type):
                 cls.tffs = tfFS
         
     
-    # @classmethod
     def build_s3fs(cls, **auth_config):
         LazyLib.import_lib('s3fs')
         LazyLib.import_lib('boto3')
@@ -71,7 +69,6 @@ class CloudFileSystemType(type):
         cls.s3t = create_s3t
 
     
-    # @classmethod
     def build_minio(cls, **auth_config):
         LazyLib.import_lib('s3fs')
         LazyLib.import_lib('boto3')
@@ -214,13 +211,16 @@ class CloudFileSystemType(type):
         
         cls.s3t = create_s3t
 
-    # def close_filesystems(cls):
-    #     if cls.fs is not None:
-    #         cls.fs.close_session(asyncio.get_running_loop(), cls.fs.)
-    #     if cls.fsa is not None:
-    #         cls.fsa.close_session()
 
-    # @classmethod
+    def build_adlfs(cls, **auth_config):
+        LazyLib.import_lib('adlfs')
+        import adlfs
+        if auth_config: settings.azure.update_auth(**auth_config)
+        config = settings.azure.build_azurefs_config()
+        cls.fs = adlfs.AzureBlobFileSystem(asynchronous = False, **config)
+        cls.fsa = rewrite_async_syntax(adlfs.AzureBlobFileSystem(asynchronous=True, **config), 'az')
+        
+
     def build_filesystems(self, force: bool = False, **auth_config):
         """
         Lazily inits the filesystems
@@ -239,7 +239,8 @@ class CloudFileSystemType(type):
             self.build_r2(**auth_config)
         elif self.fs_name == 'wasabi':
             self.build_wasabi(**auth_config)
-        # atexit.register(cls.close_filesystems)
+        elif self.fs_name == 'az':
+            self.build_adlfs(**auth_config)
 
 
     @classmethod
@@ -310,7 +311,9 @@ class BaseAccessor(NormalAccessor):
     put: Callable = create_staticmethod(CloudFileSystem, 'put')
 
     open: Callable = create_method_fs(CloudFileSystem, 'open')
-    listdir: Callable = create_method_fs(CloudFileSystem, 'ls')    
+    listdir: Callable = create_staticmethod(CloudFileSystem, 'ls')    
+    walk: Callable = create_staticmethod(CloudFileSystem, 'walk')
+
     glob: Callable = create_method_fs(CloudFileSystem, 'glob')
     find: Callable = create_method_fs(CloudFileSystem, 'find')
     touch: Callable = create_method_fs(CloudFileSystem, 'touch')
@@ -383,6 +386,7 @@ class BaseAccessor(NormalAccessor):
     async_rm: Callable = create_async_method_fs(CloudFileSystem, 'async_rm')
     async_rm_file: Callable = create_async_coro(CloudFileSystem, 'async_rm_file')
     async_listdir: Callable = create_async_method_fs(CloudFileSystem, ['async_listdir', 'async_list_objects'])
+    async_walk: Callable = create_async_method_fs(CloudFileSystem, 'async_walk')
 
     @classmethod
     def reload_cfs(cls, **kwargs):
@@ -400,7 +404,8 @@ class BaseAccessor(NormalAccessor):
         cls.metadata: Callable = create_staticmethod(cls.CloudFileSystem, ['metadata', 'info'])
 
         cls.open: Callable = create_method_fs(cls.CloudFileSystem, 'open')
-        cls.listdir: Callable = create_method_fs(cls.CloudFileSystem, 'ls')    
+        cls.listdir: Callable = create_staticmethod(cls.CloudFileSystem, 'ls')    
+        cls.walk: Callable = create_staticmethod(cls.CloudFileSystem, 'walk')
         cls.glob: Callable = create_staticmethod(cls.CloudFileSystem, 'glob')
         cls.get: Callable = create_staticmethod(cls.CloudFileSystem, 'get')
         cls.put: Callable = create_staticmethod(cls.CloudFileSystem, 'put')
@@ -483,4 +488,5 @@ class BaseAccessor(NormalAccessor):
         cls.async_remove: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_rm')
         cls.async_rm: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_rm')
         cls.async_listdir: Callable = create_async_method_fs(cls.CloudFileSystem, ['async_listdir', 'async_list_objects'])
+        cls.async_walk: Callable = create_async_method_fs(cls.CloudFileSystem, 'async_walk')
 

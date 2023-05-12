@@ -17,6 +17,7 @@ from fileio.providers.minio import *
 from fileio.providers.s3c import *
 from fileio.providers.r2 import *
 from fileio.providers.wasabi import *
+from fileio.providers.azure import *
 
 from fileio.lib.apis import (
     FastUploadFile,
@@ -52,6 +53,15 @@ GSPathLikeT = Union[
     Type[FileGSWindowsPath],
     Type[FileGSPosixPath],
     Type[PureFileGSWindowsPath],
+]
+
+AzurePathLikeT = Union[
+    Type[FileAZPurePath],
+    Type[FileAZPath],
+    Type[PureFileAZPosixPath],
+    Type[FileAZWindowsPath],
+    Type[FileAZPosixPath],
+    Type[PureFileAZWindowsPath],
 ]
 
 S3PathLikeT = Union[
@@ -172,6 +182,13 @@ _PATHLIKE_CLS: Tuple[FileLike, ...] = (
     FileS3PosixPath,
     PureFileS3WindowsPath,
 
+    FileAZPurePath,
+    FileAZPath,
+    PureFileAZPosixPath,
+    FileAZWindowsPath,
+    FileAZPosixPath,
+    PureFileAZWindowsPath,
+
     FileMinioPurePath, 
     FileMinioPath, 
     PureFileMinioPosixPath, 
@@ -202,10 +219,12 @@ _PATHLIKE_CLS: Tuple[FileLike, ...] = (
 FileSysLike = Union[
     Type[AWSFileSystem],
     Type[GCPFileSystem],
+    Type[AZFileSystem],
     Type[MinioFileSystem],
     Type[S3CFileSystem],
     Type[R2FileSystem],
     Type[WasabiFileSystem],
+
 ]
 
 PathLike = Union[str, os.PathLike, FileLike]
@@ -247,6 +266,7 @@ FileListType = TypeVar(
 _PREFIXES_TO_CLS: Dict[str, FileLike] = {
     'gs://': FileGSPath,
     's3://': FileS3Path,
+    'az://': FileAZPath,
     #'s3a://': FileMinioPath,
     'mio://': FileMinioPath,
     'minio://': FileMinioPath,
