@@ -542,6 +542,7 @@ class CloudflareR2Settings(BaseSettings):
     r2_access_key_id: Optional[str] = None
     r2_secret_access_key: Optional[str] = None
     r2_access_token: Optional[str] = None
+    r2_region: Optional[str] = None
 
     r2_endpoint: Optional[str] = None
     r2_config: Optional[Union[str, Dict[str, Any]]] = None
@@ -595,7 +596,7 @@ class CloudflareR2Settings(BaseSettings):
         config = {
             "client_kwargs": {
                 "endpoint_url": self.r2_endpoint,
-                "region_name": "auto",
+                "region_name": self.r2_region,
             },
             "config_kwargs": {}
         }
