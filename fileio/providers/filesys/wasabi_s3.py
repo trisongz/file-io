@@ -1,0 +1,137 @@
+"""
+Subclass for Wasabi S3
+"""
+
+import re
+import contextlib
+with contextlib.suppress(ImportError):
+    import s3fs
+
+bucket_format_list = [
+    re.compile(
+        r"^(?P<bucket>arn:(aws).*:wsbi:[a-z\-0-9]*:[0-9]{12}:accesspoint[:/][^/]+)/?"
+        r"(?P<key>.*)$"
+    ),
+    re.compile(
+        r"^(?P<bucket>arn:(aws).*:ws:[a-z\-0-9]*:[0-9]{12}:accesspoint[:/][^/]+)/?"
+        r"(?P<key>.*)$"
+    ),
+    re.compile(
+        r"^(?P<bucket>arn:(aws).*:s3:[a-z\-0-9]*:[0-9]{12}:accesspoint[:/][^/]+)/?"
+        r"(?P<key>.*)$"
+    ),
+    re.compile(
+        r"^(?P<bucket>arn:(aws).*:s3-outposts:[a-z\-0-9]+:[0-9]{12}:outpost[/:]"
+        r"[a-zA-Z0-9\-]{1,63}[/:](bucket|accesspoint)[/:][a-zA-Z0-9\-]{1,63})[/:]?(?P<key>.*)$"
+    ),
+    re.compile(
+        r"^(?P<bucket>arn:(aws).*:s3-outposts:[a-z\-0-9]+:[0-9]{12}:outpost[/:]"
+        r"[a-zA-Z0-9\-]{1,63}[/:]bucket[/:]"
+        r"[a-zA-Z0-9\-]{1,63})[/:]?(?P<key>.*)$"
+    ),
+    re.compile(
+        r"^(?P<bucket>arn:(aws).*:s3-object-lambda:[a-z\-0-9]+:[0-9]{12}:"
+        r"accesspoint[/:][a-zA-Z0-9\-]{1,63})[/:]?(?P<key>.*)$"
+    ),
+]
+
+class WasabiFileSystem(s3fs.S3FileSystem):
+    """
+    Access Wasabi as if it were a file system.
+
+    This exposes a filesystem-like API (ls, cp, open, etc.) on top of S3
+    storage.
+
+    Provide credentials either explicitly (``key=``, ``secret=``) or depend
+    on boto's credential methods. See botocore documentation for more
+    information. If no credentials are available, use ``anon=True``.
+
+    Parameters
+    ----------
+    anon : bool (False)
+        Whether to use anonymous connection (public buckets only). If False,
+        uses the key/secret given, or boto's credential resolver (client_kwargs,
+        environment, variables, config files, EC2 IAM server, in that order)
+    endpoint_url : string (None)
+        Use this endpoint_url, if specified. Needed for connecting to non-AWS
+        S3 buckets. Takes precedence over `endpoint_url` in client_kwargs.
+    key : string (None)
+        If not anonymous, use this access key ID, if specified. Takes precedence
+        over `aws_access_key_id` in client_kwargs.
+    secret : string (None)
+        If not anonymous, use this secret access key, if specified. Takes
+        precedence over `aws_secret_access_key` in client_kwargs.
+    token : string (None)
+        If not anonymous, use this security token, if specified
+    use_ssl : bool (True)
+        Whether to use SSL in connections to S3; may be faster without, but
+        insecure. If ``use_ssl`` is also set in ``client_kwargs``,
+        the value set in ``client_kwargs`` will take priority.
+    s3_additional_kwargs : dict of parameters that are used when calling s3 api
+        methods. Typically used for things like "ServerSideEncryption".
+    client_kwargs : dict of parameters for the botocore client
+    requester_pays : bool (False)
+        If RequesterPays buckets are supported.
+    default_block_size: int (None)
+        If given, the default block size value used for ``open()``, if no
+        specific value is given at all time. The built-in default is 5MB.
+    default_fill_cache : Bool (True)
+        Whether to use cache filling with open by default. Refer to
+        ``S3File.open``.
+    default_cache_type : string ("readahead")
+        If given, the default cache_type value used for ``open()``. Set to "none"
+        if no caching is desired. See fsspec's documentation for other available
+        cache_type values. Default cache_type is "readahead".
+    version_aware : bool (False)
+        Whether to support bucket versioning.  If enable this will require the
+        user to have the necessary IAM permissions for dealing with versioned
+        objects. Note that in the event that you only need to work with the
+        latest version of objects in a versioned bucket, and do not need the
+        VersionId for those objects, you should set ``version_aware`` to False
+        for performance reasons. When set to True, filesystem instances will
+        use the S3 ListObjectVersions API call to list directory contents,
+        which requires listing all historical object versions.
+    cache_regions : bool (False)
+        Whether to cache bucket regions or not. Whenever a new bucket is used,
+        it will first find out which region it belongs and then use the client
+        for that region.
+    asynchronous :  bool (False)
+        Whether this instance is to be used from inside coroutines.
+    config_kwargs : dict of parameters passed to ``botocore.client.Config``
+    kwargs : other parameters for core session.
+    session : aiobotocore AioSession object to be used for all connections.
+         This session will be used inplace of creating a new session inside S3FileSystem.
+         For example: aiobotocore.session.AioSession(profile='test_user')
+
+    The following parameters are passed on to fsspec:
+
+    skip_instance_cache: to control reuse of instances
+    use_listings_cache, listings_expiry_time, max_paths: to control reuse of directory listings
+
+    Examples
+    --------
+    >>> s3 = WasabiFileSystem(anon=False)  # doctest: +SKIP
+    >>> s3.ls('my-bucket/')  # doctest: +SKIP
+    ['my-file.txt']
+
+    >>> with s3.open('my-bucket/my-file.txt', mode='rb') as f:  # doctest: +SKIP
+    ...     print(f.read())  # doctest: +SKIP
+    b'Hello, world!'
+    """
+
+    def _find_bucket_key(self, s3_path: str):
+        """
+        This is a helper function that given an s3 path such that the path is of
+        the form: bucket/key
+        It will return the bucket and the key represented by the s3 path
+        """
+
+        
+        for bucket_format in bucket_format_list:
+            match = bucket_format.match(s3_path)
+            if match:
+                return match.group("bucket"), match.group("key")
+        s3_components = s3_path.split("/", 1)
+        bucket = s3_components[0]
+        s3_key = s3_components[1] if len(s3_components) > 1 else ""
+        return bucket, s3_key

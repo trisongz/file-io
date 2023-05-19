@@ -105,7 +105,6 @@ class IterableAIOFile(AIOFile):
         await super().write(data, offset)
         self._set_offset(offset, data)
 
-
 async def read_lines(
     path: Paths,
     line_sep: str = SEP,

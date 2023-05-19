@@ -17,6 +17,7 @@ from fileio.utils import logger
 
 if TYPE_CHECKING:
     from fileio.lib.types import PathLike, FileLike
+    from fsspec.asyn import AsyncFileSystem
     # from fileio.core.generic import PathLike
 
 
@@ -99,7 +100,24 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
 
     @property
     def _path(self) -> str:
+        """
+        Returns the path as a string
+        """
         return self._cloudstr if self.is_cloud else str(self)
+    
+    @property
+    def filesys(self) -> Optional['AsyncFileSystem']:
+        """
+        Returns the filesystem object
+        """
+        return getattr(self._accessor, 'filesys', None)
+
+    @property
+    def afilesys(self) -> Optional['AsyncFileSystem']:
+        """
+        The async filesystem object associated with this path.
+        """
+        return getattr(self._accessor, 'async_filesys', None)
 
     @property
     def _cloudpath(self) -> str:
@@ -114,8 +132,8 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         Returns the `__fspath__` string representation without the uri_scheme
         """
-        if self._prefix in self.parts[0]: return self.parts[1]
-        return self.parts[0]
+        return self.parts[1] if self._prefix in self.parts[0] \
+            else self.parts[0]
 
     @property
     def _bucketstr(self) -> str:
@@ -204,7 +222,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         Return info of path
         """
-        return self._accessor.info(path=self._path)
+        return self._accessor.info(path=self._cloudpath)
 
     @property
     def metadata_(self):
@@ -240,7 +258,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
 
     @property
     def checksum(self):
-        return self._accessor.checksum(path=self._path)
+        return self._accessor.checksum(path=self._cloudpath)
 
     @property
     def last_modified(self) -> 'datetime.datetime':
@@ -359,8 +377,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         if self._prefix == 'gs':
             r = await self.async_stat_
             ts = r.get('updated', '')
-            if ts: return datetime.datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S.%fZ')#.isoformat()
-            return ts
+            return datetime.datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S.%fZ') if ts else ts
         return await self._accessor.async_modified(self._cloudpath)
 
     @property
@@ -434,21 +451,53 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         #self.touch()
         return get_cloud_file(self._accessor.open(self._cloudpath, mode=mode, buffering=buffering, encoding=encoding, errors=errors, block_size=block_size, compression=compression, newline=newline, **kwargs))
 
-    def read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS) -> str:
+    def read(self, mode: FileMode = 'rb', size: Optional[int] = -1, offset: Optional[int] = 0, **kwargs) -> Union[str, bytes]:
+        """
+        Read and return the file's contents.
+        """
+        with self.open(mode=mode, **kwargs) as file:
+            return file.read(size, offset)
+        
+    async def async_read(self, mode: FileMode = 'rb', size: Optional[int] = -1, offset: Optional[int] = 0, **kwargs):
+        """
+        Read and return the file's contents.
+        """
+        async with self.async_open(mode=mode, **kwargs) as file:
+            return await file.read(size, offset)
+
+    def read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS, **kwargs) -> str:
+        """
+        Read and return the file's contents.
+        """
+        if hasattr(self.filesys, 'read_text'):
+            return self.filesys.read_text(self._cloudpath, encoding=encoding, errors=errors, **kwargs)
         with self.open('r', encoding=encoding, errors=errors) as file:
             return file.read()
 
-    async def async_read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS) -> str:
-        async with self.async_open('r', encoding=encoding, errors=errors) as file:
+    async def async_read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS, **kwargs) -> str:
+        """
+        Read and return the file's contents.
+        """
+        async with self.async_open('r', encoding=encoding, errors=errors, **kwargs) as file:
             return await file.read()
 
-    def read_bytes(self) -> bytes:
-        with self.open('rb') as file:
-            return file.read()
+    def read_bytes(self, start: Optional[Any] = None, end: Optional[Any] = None, **kwargs) -> bytes:
+        """
+        Read and return the file's contents.
+        """
+        if hasattr(self.filesys, 'read_bytes'):
+            return self.filesys.read_bytes(self._cloudpath, start=start, end=end)
+        return self._accessor.cat_file(self._cloudpath, start = start, end = end, **kwargs)
 
-    async def async_read_bytes(self) -> bytes:
-        async with self.async_open('rb') as file:
-            return await file.read()
+    async def async_read_bytes(self, start: Optional[Any] = None, end: Optional[Any] = None, **kwargs) -> bytes:
+        """
+        Read and return the file's contents.
+        """
+        # async with self.async_open('rb') as file:
+        #     return await file.read()
+        
+        return await self._accessor.async_cat_file(self._cloudpath, start = start, end = end, **kwargs)
+        
 
     def write_bytes(self, data: bytes) -> int:
         """
@@ -493,6 +542,10 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         Open the file in text mode, write to it, and close the file.
         """
         if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
+        
+        # Check if the filesys has `write_text` method
+        if hasattr(self.filesys, 'write_text'):
+            return self.filesys.write_text(self._cloudpath, data, encoding=encoding, errors=errors, newline=newline)
         with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
             return f.write(data)
 
@@ -630,7 +683,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         Remove this file.
         If the path is a directory, use rmdir() instead.
         """
-        try: self._accessor.rm(self._path, recursive = recursive, maxdepth = maxdepth)
+        try: self._accessor.rm(self._cloudpath, recursive = recursive, maxdepth = maxdepth)
         except Exception as e:
             if not missing_ok: raise e
 
@@ -640,7 +693,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         Remove this file.
         If the path is a directory, use rmdir() instead.
         """
-        try: await self._accessor.async_rm(self._path, recursive = recursive, maxdepth = maxdepth)
+        try: await self._accessor.async_rm(self._cloudpath, recursive = recursive, maxdepth = maxdepth)
         except Exception as e:
             if not missing_ok: raise e
 
@@ -650,7 +703,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         If the path is a directory, use rmdir() instead.
         """
         try:
-            self._accessor.rm_file(self._path)
+            self._accessor.rm_file(self._cloudpath)
             return True
         except Exception as e:
             if missing_ok: return False
@@ -663,7 +716,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         If the path is a directory, use rmdir() instead.
         """
         try:
-            await self._accessor.async_rm_file(self._path)
+            await self._accessor.async_rm_file(self._cloudpath)
             return True
         except Exception as e:
             if missing_ok: return False
@@ -1260,8 +1313,8 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         if dest.exists() and not overwrite and dest.is_file():
             if skip_errors: return dest
             raise exceptions.FileExistsError(f'File {dest._path} exists')
-        if dest.is_cloud: self._accessor.copy(self._path, dest._path, recursive)
-        else: self._accessor.get(self._path, dest._path, recursive)
+        if dest.is_cloud: self._accessor.copy(self._cloudpath, dest._cloudpath, recursive)
+        else: self._accessor.get(self._cloudpath, dest._path, recursive)
         return dest
 
     async def async_copy(self, dest: 'FileLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):
@@ -1288,8 +1341,8 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         if dest.exists() and not overwrite and dest.is_file():
             if skip_errors: return dest
             raise exceptions.FileExistsError(f'File {dest._path} exists')
-        if dest.is_cloud: self._accessor.copy(self._path, dest._path, recursive)
-        else: self._accessor.get(self._path, dest._path, recursive)
+        if dest.is_cloud: self._accessor.copy(self._cloudpath, dest._cloudpath, recursive)
+        else: self._accessor.get(self._cloudpath, dest._path, recursive)
         return dest
 
     async def async_copy_file(self, dest: 'FileLike', recursive: bool = False, overwrite: bool = False, skip_errors: bool = False):

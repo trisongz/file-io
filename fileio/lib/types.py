@@ -10,7 +10,7 @@ import atexit
 
 from fileio.lib.core import pathlib, IterableAIOFile
 from fileio.lib.base import *
-
+from fileio.lib.posix.cloud import CloudFileSystemPath
 from fileio.providers.gcs import *
 from fileio.providers.s3 import *
 from fileio.providers.minio import *
@@ -149,7 +149,7 @@ WasabiPathLikeT = Union[
 
 # ]
 FileLike = PathLikeT
-
+FileLikeT = TypeVar("FileLikeT", bound=FileLike)
 # FileLike = Union[
 #     PathLikeT,
 #     GSPathLikeT,
@@ -355,7 +355,12 @@ def get_filelike(path: FileType) -> FileLike:
     if hasattr(path, 'file') and hasattr(getattr(path, 'file'), 'name'): return get_path(path.file.name)
     return get_path(path.name) if hasattr(path, 'name') else path
 
-class File:
+# FileT = TypeVar('FileT', bound = FileLike)
+
+class File(CloudFileSystemPath):
+    
+    # __metaclass__ = Type[FileLike]
+
     def __new__(
         cls, 
         *args, 
@@ -363,7 +368,7 @@ class File:
         mode: LoadMode = 'default', 
         loader: Callable = None, 
         **kwargs
-    ) -> Union[FileLike, Any]:
+    ) -> FileLikeT:
 
         _file = get_filelike(*args, **kwargs)
         if load_file: return cls.load_file(file = _file, mode = mode, loader = loader)

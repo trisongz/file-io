@@ -1,12 +1,11 @@
 import atexit
 import contextlib
-from fsspec.asyn import sync
 from typing import Callable, Any, Optional, Union, Dict, Type, TYPE_CHECKING
 
 from fileio.lib.posix.meta import CloudFileSystemType, BaseAccessor
 
 if TYPE_CHECKING:
-    from fileio.providers.tfio import tfFS
+    from fileio.providers.tfio import tfFS    
     with contextlib.suppress(ImportError):
         import gcsfs
     with contextlib.suppress(ImportError):
@@ -15,6 +14,10 @@ if TYPE_CHECKING:
         import boto3
     with contextlib.suppress(ImportError):
         import adlfs
+    with contextlib.suppress(ImportError):
+        from fileio.providers.filesys.cloudflare_r2 import R2FileSystem
+    with contextlib.suppress(ImportError):
+        from fileio.providers.filesys.wasabi_s3 import WasabiFileSystem
 
     # with contextlib.suppress(ImportError):
     #     from fileio.providers.hffs.filesys import HfFileSystem
@@ -71,15 +74,17 @@ class S3Compat_CloudFileSystem(metaclass=CloudFileSystemType):
     #     # self.fsa.s3.close()
 
 class R2_CloudFileSystem(metaclass=CloudFileSystemType):
-    fs: 's3fs.S3FileSystem' = None
-    fsa: 's3fs.S3FileSystem' = None
+    fs: 'R2FileSystem' = None
+    fsa: 'R2FileSystem' = None
     fs_name: str = 'r2'
     boto: 'boto3.session.Session' = None
     s3t: Callable = None
 
 class Wasabi_CloudFileSystem(metaclass=CloudFileSystemType):
-    fs: 's3fs.S3FileSystem' = None
-    fsa: 's3fs.S3FileSystem' = None
+    # fs: 's3fs.S3FileSystem' = None
+    # fsa: 's3fs.S3FileSystem' = None
+    fs: 'WasabiFileSystem' = None
+    fsa: 'WasabiFileSystem' = None
     fs_name: str = 'wasabi'
     boto: 'boto3.session.Session' = None
     s3t: Callable = None

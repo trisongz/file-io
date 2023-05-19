@@ -15,6 +15,9 @@ from fileio.lib.flavours import _pathz_windows_flavour, _pathz_posix_flavour
 from fileio.utils import get_file_info
 import fileio.lib.exceptions as exceptions
 
+if TYPE_CHECKING:
+    from fsspec.asyn import AsyncFileSystem
+
 def scandir_sync(*args, **kwargs) -> Iterable[EntryWrapper]:
     yield from _scandir_results(*args, **kwargs)
 
@@ -141,6 +144,8 @@ class _FileAccessor(NormalAccessor):
 
     def __enter__(self):
         return self
+    
+    
 
 _pathz_accessor = _FileAccessor()
 
@@ -207,10 +212,26 @@ class FilePath(Path, FilePurePath):
 
         self._init()
         return self
+    
+    @property
+    def filesys(self) -> Optional['AsyncFileSystem']:
+        """
+        The filesystem object associated with this path.
+        """
+        return getattr(self._accessor, 'filesys', None)
+    
+    @property
+    def afilesys(self) -> Optional['AsyncFileSystem']:
+        """
+        The filesystem object associated with this path.
+        """
+        return getattr(self._accessor, 'async_filesys', None)
 
     @property
     def _path(self) -> str:
-
+        """
+        Returns the path as a string
+        """
         return self._cloudstr if self.is_cloud else str(self)
     
     @property
@@ -451,21 +472,45 @@ class FilePath(Path, FilePurePath):
         """
         return get_handle(self._path, mode, encoding=encoding, errors=errors, newline=newline)
 
+    def read(self, mode: FileMode = 'rb', size: Optional[int] = -1, offset: Optional[int] = 0, **kwargs) -> Union[str, bytes]:
+        with self.open(mode=mode, **kwargs) as file:
+            return file.read(size, offset)
+
+    async def async_read(self, mode: FileMode = 'rb', size: Optional[int] = -1, offset: Optional[int] = 0, **kwargs):
+        """
+        Read and return the file's contents.
+        """
+        async with self.async_open(mode=mode, **kwargs) as file:
+            return await file.read(size, offset)
+
     def read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS) -> str:
         with self.open('r', encoding=encoding, errors=errors) as file:
             return file.read()
 
     async def async_read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS) -> str:
         async with self.async_open('r', encoding=encoding, errors=errors) as file:
+
             return await file.read()
 
-    def read_bytes(self) -> bytes:
-        with self.open('rb') as file:
-            return file.read()
+    def read_bytes(self, start: Optional[Any] = None, end: Optional[Any] = None, **kwargs) -> bytes:
+        with self.open('rb', **kwargs) as f:
+            if start is not None:
+                if start >= 0:
+                    f.seek(start)
+                else:
+                    f_size = os.path.getsize(self._path)
+                    # f_size = os.fstat(f.fileno()).st_size
+                    f.seek(max(0, f_size + start))
+            if end is not None:
+                if end < 0:
+                    f_size = os.path.getsize(self._path)
+                    end = f_size + end
+                return f.read(end - f.tell())
+            return f.read()
 
-    async def async_read_bytes(self) -> bytes:
-        async with self.async_open('rb') as file:
-            return await file.read()
+    async def async_read_bytes(self, **kwargs) -> bytes:
+        async with self.async_open('rb', **kwargs) as f:
+            return await f.read()
 
     def write_bytes(self, data: bytes) -> int:
         """
@@ -1183,13 +1228,14 @@ class FilePath(Path, FilePurePath):
         """
         Return the size of the file in bytes, reported by os.path.getsize().
         """
-        return self._accessor.size(self)
+        return os.path.getsize(self._path)
+        # return self._accessor.size(self._path)
 
     async def async_size(self) -> int:
         """
         Return the size of the file in bytes, reported by os.path.getsize().
         """
-        return await self._accessor.async_size(self)
+        return await self._accessor.async_size(self._path)
     
     def bytesize(self) -> ByteSize:
         """

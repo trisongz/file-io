@@ -1,3 +1,4 @@
+from __future__ import annotations
 
 """
 Contains the base metaclass for providers
@@ -13,6 +14,7 @@ from fileio.utils import LazyLib, settings, logger
 
 if TYPE_CHECKING:
     from fileio.providers.tfio import tfFS
+    from fsspec.asyn import AsyncFileSystem
 
 class CloudFileSystemType(type):
     fs: ModuleType = None
@@ -150,11 +152,15 @@ class CloudFileSystemType(type):
         import boto3
         import boto3.s3.transfer as s3transfer
         from botocore.config import Config as BotoConfig
+        from fileio.providers.filesys.cloudflare_r2 import R2FileSystem
 
         if auth_config: settings.r2.update_auth(**auth_config)
         config = settings.r2.build_s3fs_config()
-        cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
-        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+        cls.fs = R2FileSystem(asynchronous=False, **config)
+        cls.fsa = rewrite_async_syntax(R2FileSystem(asynchronous=True, **config))
+        # cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
+        # cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+
                 
         boto_config = BotoConfig(
             max_pool_connections = settings.core.num_workers * 2
@@ -185,11 +191,14 @@ class CloudFileSystemType(type):
         import boto3
         import boto3.s3.transfer as s3transfer
         from botocore.config import Config as BotoConfig
+        from fileio.providers.filesys.wasabi_s3 import WasabiFileSystem
 
         if auth_config: settings.wasabi.update_auth(**auth_config)
         config = settings.wasabi.build_s3fs_config()
-        cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
-        cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+        # cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
+        # cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
+        cls.fs = WasabiFileSystem(asynchronous=False, **config)
+        cls.fsa = rewrite_async_syntax(WasabiFileSystem(asynchronous=True, **config))
                 
         boto_config = BotoConfig(
             max_pool_connections = settings.core.num_workers * 2
@@ -289,8 +298,11 @@ def create_async_coro(cfs: Type[CloudFileSystemType], name: Union[str, List[str]
 
 
 class BaseAccessor(NormalAccessor):
-    """Dummy Accessor class
     """
+    Dummy Accessor class
+    """
+
+    
     class CloudFileSystem(metaclass=CloudFileSystemType):
         pass
     
@@ -340,8 +352,8 @@ class BaseAccessor(NormalAccessor):
     setxattr: Callable = create_method_fs(CloudFileSystem, 'setxattr')
     invalidate_cache: Callable = create_method_fs(CloudFileSystem, 'invalidate_cache')
     
-    filesys: ClassVar = CloudFileSystem.fs
-    async_filesys: ClassVar = CloudFileSystem.fsa
+    filesys: 'AsyncFileSystem' = CloudFileSystem.fs
+    async_filesys: 'AsyncFileSystem' = CloudFileSystem.fsa
 
     boto: ClassVar = CloudFileSystem.boto
     s3t: Callable = CloudFileSystem.s3t
