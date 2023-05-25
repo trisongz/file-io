@@ -635,7 +635,7 @@ class File(CloudFileSystemPath):
 
     @classmethod
     def validate(cls, v: Union[FileLike, Any]) -> FileLike:
-        return get_filelike(v)
+        return get_filelike(v) if v is not None else None
     
     @classmethod
     def __modify_schema__(cls, field_schema: Dict[str, Any]) -> None:
