@@ -627,7 +627,24 @@ class File(CloudFileSystemPath):
         if _file.extension in {'.tsv'}:
             return cls.load_tsv(file = _file)
         raise ValueError(f'Unknown file extension: {_file.extension}')
-        
+    
+    # Pydantic methods
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v: Union[FileLike, Any]) -> FileLike:
+        return get_filelike(v)
+    
+    @classmethod
+    def __modify_schema__(cls, field_schema: Dict[str, Any]) -> None:
+        field_schema.update(
+            type='string',
+            format='binary',
+        )
+    
+
 
 
 class StatelessFile:
