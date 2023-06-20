@@ -683,6 +683,9 @@ class PurePath(object):
         """
         if cls is PurePath:
             cls = PureWindowsPath if os.name == 'nt' else PurePosixPath
+        # from pathlib import Path
+        # cls.__mro__ = (cls, Path) + cls.__mro__[1:]
+        # print(cls.__mro__)
         return cls._from_parts(args)
 
     def __reduce__(self):
@@ -715,6 +718,7 @@ class PurePath(object):
         # We need to call _parse_args on the instance, so as to get the
         # right flavour.
         self = object.__new__(cls)
+        # self = cls.__new__()
         drv, root, parts = self._parse_args(args)
         self._drv = drv
         self._root = root
@@ -1073,7 +1077,6 @@ class PureWindowsPath(PurePath):
 
 
 # Filesystem-accessing classes
-
 
 class Path(PurePath):
     """PurePath subclass that can make system calls.
@@ -1601,6 +1604,7 @@ class PosixPath(Path, PurePosixPath):
     """
     __slots__ = ()
 
+
 class WindowsPath(Path, PureWindowsPath):
     """Path subclass for Windows systems.
 
@@ -1610,3 +1614,4 @@ class WindowsPath(Path, PureWindowsPath):
 
     def is_mount(self):
         raise NotImplementedError("Path.is_mount() is unsupported on this system")
+    

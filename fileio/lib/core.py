@@ -27,6 +27,7 @@ from fileio.lib.aiopath.handle import IterableAIOFile, get_handle
 
 # if 3.10
 if sys.version_info.minor >= 10:
+    from fileio.utils.ops import register_pydantic_type
     import fileio.lib.pathz as pathlib
     from fileio.lib.pathz import PosixPath, WindowsPath, Path, PurePath, _ignore_error
     from fileio.lib.pathz import _NormalAccessor as NormalAccessor
@@ -41,6 +42,10 @@ if sys.version_info.minor >= 10:
 
         async def _async_getfinalpathname(*args, **kwargs):
             raise ImportError("_getfinalpathname() requires a Windows/NT platform")
+
+    register_pydantic_type(Path, str)
+    register_pydantic_type(PosixPath, str)
+    register_pydantic_type(WindowsPath, str)
 
 else:
     import pathlib

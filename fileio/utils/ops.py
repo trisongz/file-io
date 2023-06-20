@@ -143,3 +143,17 @@ async def async_fetch_file_from_url(
     return path
 
 
+try:
+    from pydantic.json import ENCODERS_BY_TYPE
+except ImportError:
+    ENCODERS_BY_TYPE = None 
+
+
+def register_pydantic_type(obj, t):
+    """
+    Registers the type with Pydantic's JSON encoder.
+    """
+    global ENCODERS_BY_TYPE
+    if ENCODERS_BY_TYPE is None: return
+    # print(f"Registering {obj} = {t} with Pydantic's JSON encoder.")
+    ENCODERS_BY_TYPE[obj] = t
