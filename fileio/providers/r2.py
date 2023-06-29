@@ -69,6 +69,30 @@ class FileR2Path(CloudFileSystemPath):
         self._init()
         return self
     
+    def async_open(self, mode: FileMode = 'r', buffering: int = -1, encoding: Optional[str] = DEFAULT_ENCODING, errors: Optional[str] = ON_ERRORS, newline: Optional[str] = NEWLINE, block_size: int = 150 * 1024 * 1024, compression: str = None, **kwargs: Any) -> IterableAIOFile:
+        """
+        Asyncronously Open the file pointed by this path and return a file object, as
+        the built-in open() function does.
+        compression = infer doesn't work all that well.
+        """
+        #self._fileio = self._accessor.open(self._cloudpath, mode=mode, encoding=encoding, errors=errors, block_size=block_size, compression=compression, newline=newline, buffering=buffering, **kwargs)
+        #print(type(self._fileio))
+        #return get_cloud_file(self._fileio)
+        # Test v2
+        return get_cloudfs_file(
+            self._accessor,
+            self._cloudpath, 
+            mode=mode, 
+            encoding=encoding, 
+            errors=errors, 
+            block_size=block_size, 
+            compression=compression, 
+            newline=newline, 
+            buffering=buffering, 
+            **kwargs
+        )
+        # return get_cloud_file(self._accessor.open(self._cloudpath, mode=mode, encoding=encoding, errors=errors, block_size=block_size, compression=compression, newline=newline, buffering=buffering, **kwargs))
+
 
     # Implement some stuff that boto is faster in
     def upload_file(self, dest: 'FileLike', filename: Optional[str] = None, overwrite: bool = True, **kwargs):
