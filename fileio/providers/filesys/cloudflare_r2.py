@@ -42,6 +42,7 @@ bucket_format_list = [
     ),
 ]
 
+# MPU seems to work > 150MB?
 _debug_mode: bool = True
 
 def _log(f, *args, **kwargs):
