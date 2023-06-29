@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import atexit
 import contextlib
 from typing import Callable, Any, Optional, Union, Dict, Type, TYPE_CHECKING
@@ -18,6 +20,10 @@ if TYPE_CHECKING:
         from fileio.providers.filesys.cloudflare_r2 import R2FileSystem
     with contextlib.suppress(ImportError):
         from fileio.providers.filesys.wasabi_s3 import WasabiFileSystem
+    
+    with contextlib.suppress(ImportError):
+        from s3transfer.manager import TransferManager
+
 
     # with contextlib.suppress(ImportError):
     #     from fileio.providers.hffs.filesys import HfFileSystem
@@ -34,7 +40,7 @@ class AWS_CloudFileSystem(metaclass=CloudFileSystemType):
     fsa: 's3fs.S3FileSystem' = None
     fs_name: str = 's3fs'
     boto: 'boto3.session.Session' = None
-    s3t: Callable = None
+    s3t: 'TransferManager' = None
 
 
 class Minio_CloudFileSystem(metaclass=CloudFileSystemType):
@@ -42,14 +48,14 @@ class Minio_CloudFileSystem(metaclass=CloudFileSystemType):
     fsa: 's3fs.S3FileSystem' = None
     fs_name: str = 'minio'
     boto: 'boto3.session.Session' = None
-    s3t: Callable = None
+    s3t: 'TransferManager' = None
 
 class S3Compat_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 's3fs.S3FileSystem' = None
     fsa: 's3fs.S3FileSystem' = None
     fs_name: str = 's3c'
     boto: 'boto3.session.Session' = None
-    s3t: Callable = None
+    s3t: 'TransferManager' = None
 
     # async def _aonexit(self, *args, **kwargs):
     #     """
@@ -78,7 +84,7 @@ class R2_CloudFileSystem(metaclass=CloudFileSystemType):
     fsa: 'R2FileSystem' = None
     fs_name: str = 'r2'
     boto: 'boto3.session.Session' = None
-    s3t: Callable = None
+    s3t: 'TransferManager' = None
 
 class Wasabi_CloudFileSystem(metaclass=CloudFileSystemType):
     # fs: 's3fs.S3FileSystem' = None
@@ -87,7 +93,7 @@ class Wasabi_CloudFileSystem(metaclass=CloudFileSystemType):
     fsa: 'WasabiFileSystem' = None
     fs_name: str = 'wasabi'
     boto: 'boto3.session.Session' = None
-    s3t: Callable = None
+    s3t: 'TransferManager' = None
 
 class Azure_CloudFileSystem(metaclass=CloudFileSystemType):
     fs: 'adlfs.AzureBlobFileSystem' = None

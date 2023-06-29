@@ -404,6 +404,19 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         #self._fileio = self._accessor.open(self._cloudpath, mode=mode, encoding=encoding, errors=errors, block_size=block_size, compression=compression, newline=newline, buffering=buffering, **kwargs)
         #print(type(self._fileio))
         #return get_cloud_file(self._fileio)
+        # Test v2
+        # return get_cloudfs_file(
+        #     self._accessor,
+        #     self._cloudpath, 
+        #     mode=mode, 
+        #     encoding=encoding, 
+        #     errors=errors, 
+        #     block_size=block_size, 
+        #     compression=compression, 
+        #     newline=newline, 
+        #     buffering=buffering, 
+        #     **kwargs
+        # )
         return get_cloud_file(self._accessor.open(self._cloudpath, mode=mode, encoding=encoding, errors=errors, block_size=block_size, compression=compression, newline=newline, buffering=buffering, **kwargs))
 
 

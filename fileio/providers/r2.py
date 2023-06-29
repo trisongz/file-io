@@ -6,7 +6,10 @@ from fileio.lib.posix.base import *
 from fileio.lib.posix.filesys import R2_CloudFileSystem, R2_Accessor
 from fileio.lib.posix.cloud import *
 from fileio.utils import logger
-from typing import Mapping
+from typing import Mapping, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from fileio.lib.types import FileLike
 
 class FileR2PurePath(CloudFileSystemPurePath):
     _prefix: str = 'r2'
@@ -68,7 +71,7 @@ class FileR2Path(CloudFileSystemPath):
     
 
     # Implement some stuff that boto is faster in
-    def upload_file(self, dest: PathLike, filename: Optional[str] = None, overwrite: bool = True, **kwargs):
+    def upload_file(self, dest: 'FileLike', filename: Optional[str] = None, overwrite: bool = True, **kwargs):
         """
         Upload a file to R2
 
@@ -85,8 +88,8 @@ class FileR2Path(CloudFileSystemPath):
     
     def download_file(
         self, 
-        output_file: Optional[PathLike] = None,
-        output_dir: Optional[PathLike] = None,
+        output_file: Optional['FileLike'] = None,
+        output_dir: Optional['FileLike'] = None,
         filename: Optional[str] = None,
         overwrite: bool = True,
         callbacks: Optional[List[Any]] = None,
@@ -98,31 +101,37 @@ class FileR2Path(CloudFileSystemPath):
         assert output_file or output_dir, "Must provide either output_file or output_dir"
         output_file = output_file or output_dir.joinpath(filename or self.name)
         assert overwrite or not output_file.exists(), f"{output_file} already exists and overwrite is False"
-        s3t = self._accessor.s3t()
-        s3t.download(
+        # s3t = self._accessor.s3t()
+        self._accessor.s3t.download(
             self._bucket,
             self.get_path_key(self.name),
             output_file.as_posix(),
             subscribers = callbacks
         )
-        s3t.shutdown()
+        # self._accessor.s3t.shutdown()
         return output_file
 
-    async def async_upload_file(self, dest: PathLike, filename: Optional[str] = None,  overwrite: bool = True, **kwargs):
+    async def async_upload_file(
+        self, 
+        source: 'FileLike', 
+        filename: Optional[str] = None,  
+        overwrite: bool = True, 
+        **kwargs
+    ):
         """
         Upload a file to R2
 
         Utilize boto3
         """
-        if not overwrite and await dest.async_exists(): raise FileExistsError(f"{dest} already exists and overwrite is False")
+        if not overwrite and await source.async_exists(): raise FileExistsError(f"{source} already exists and overwrite is False")
         filename = filename or self.name
-        s3t = self._accessor.s3t()
-        s3t.upload(
-            dest.as_posix(),
+        # s3t = self._accessor.s3t()
+        self._accessor.s3t.upload(
+            source.as_posix(),
             self._bucket,
             self.get_path_key(filename)
         )
-        s3t.shutdown()
+        # self._accessor.s3t.shutdown()
         #await to_thread(
         #    self._accessor.boto.upload_file, Bucket = self._bucket, Key = self.get_path_key(filename), Filename = dest.as_posix()
         #)
@@ -130,7 +139,7 @@ class FileR2Path(CloudFileSystemPath):
 
     def batch_upload_files(
         self, 
-        files: Optional[List[PathLike]] = None,
+        files: Optional[List['FileLike']] = None,
         glob_path: Optional[str] = None,
         overwrite: bool = False,
         skip_existing: bool = True,
@@ -145,23 +154,23 @@ class FileR2Path(CloudFileSystemPath):
         assert files or glob_path, "Must provide either files or glob_path"
         if glob_path: files = list(self.glob(glob_path))
         results = []
-        s3t = self._accessor.s3t()
+        # s3t = self._accessor.s3t()
         for file in files:
             if not overwrite and skip_existing and file.exists(): continue
-            s3t.upload(
+            self._accessor.s3t.upload(
                 file.as_posix(),
                 self._bucket,
                 self.get_path_key(file.name),
                 subscribers = callbacks
             )
             results.append(self.parent.joinpath(file.name))
-        s3t.shutdown()
+        # self._accessor.s3t.shutdown()
         return results
     
     def batch_download_files(
         self,
         glob_path: str,
-        output_dir: PathLike,
+        output_dir: 'FileLike',
         overwrite: bool = False,
         skip_existing: bool = True,
         callbacks: Optional[List[Any]] = None,
@@ -172,18 +181,18 @@ class FileR2Path(CloudFileSystemPath):
         """
         files = list(self.glob(glob_path))
         results = []
-        s3t = self._accessor.s3t()
+        # s3t = self._accessor.s3t()
         for file in files:
             if not overwrite and skip_existing and file.exists(): continue
             output_file = output_dir.joinpath(file.name)
-            s3t.download(
+            self._accessor.s3t.download(
                 self._bucket,
                 self.get_path_key(file.name),
                 output_file.as_posix(),
                 subscribers = callbacks
             )
             results.append(output_file)
-        s3t.shutdown()
+        self._accessor.s3t.shutdown()
         return results
 
 

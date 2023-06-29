@@ -773,7 +773,7 @@ class FilePath(Path, FilePurePath):
         if not dest.is_cloud:
             await self._accessor.async_copy_file(self._path, dest._path, **kwargs)
             return dest
-        await dest._accessor.async_put_file(self._path, dest._path, recursive)
+        await dest._accessor.async_put_file(self._path, dest._path, recursive = recursive)
         return dest
 
     def rm(self, **kwargs):

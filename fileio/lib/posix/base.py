@@ -8,6 +8,9 @@ from fileio.types.common import *
 
 if TYPE_CHECKING:
     from fileio.lib.base import FilePath
+    from fsspec.spec import AbstractBufferedFile
+    from fsspec.asyn import AsyncFileSystem, AbstractAsyncStreamedFile
+    from fileio.lib.posix.filesys import CloudFileSystemLike, AccessorLike
 
 GIT_PREFIXES = ('gh://', 'git://', 'hf://')
 URI_PREFIXES = ('gs://', 's3://', 'az://', 'minio://', 'mio://', 's3c://', 'r2://', 'wsbi://') + GIT_PREFIXES
@@ -70,3 +73,40 @@ async def get_cloud_file(filelike: Paths) -> AsyncContextManager[Handle]:
     file = AsyncFile(filelike)
     yield file
     await file.aclose()
+
+@asynccontextmanager
+async def get_cloudfs_file(accessor: 'AccessorLike', path: Paths, mode: FileMode = 'rb', **kwargs) -> AsyncContextManager[Handle]:
+    """
+    Helper function to open a file from a filesystem
+    """
+    print('USING ASYNC')
+    if 'b' in mode and hasattr(accessor.async_filesys, 'open_async'):
+        print('USING ASYNC STREAMED')
+        try:
+            file: 'AbstractAsyncStreamedFile' = await accessor.async_filesys.open_async(path, mode, **kwargs)
+            print('YIELDING FILE', type(file), file)
+            yield file
+            # async with file as f:
+            #     print('YIELDING FILE')
+            #     yield f
+
+        finally:
+            print('CLOSING FILE')
+            await file.close()
+        # file: 'AbstractAsyncStreamedFile' = await accessor.async_filesys.open_async(path, mode, **kwargs)
+        # yield file
+        # await file.close()
+    else:
+        syncfile: 'AbstractBufferedFile' = accessor.open(path, mode, **kwargs)
+        filelike = cast(IO[Union[str, bytes, os.PathLike, Any]], syncfile)
+        file = AsyncFile(filelike)
+        yield file
+        await file.aclose()
+
+    # file: AsyncFile
+    # file = AsyncFile(filesys)
+    # yield file
+    # if hasattr(file, 'aclose'):
+    #     await file.aclose()
+    # else:
+    #     await file.close()

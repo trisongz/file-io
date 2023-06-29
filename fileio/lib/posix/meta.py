@@ -5,6 +5,7 @@ Contains the base metaclass for providers
 """
 import atexit
 import asyncio
+import contextlib
 from types import ModuleType
 from typing import Callable, Any, Optional, Coroutine, Type, Union, List, ClassVar, TYPE_CHECKING
 
@@ -16,12 +17,15 @@ if TYPE_CHECKING:
     from fileio.providers.tfio import tfFS
     from fsspec.asyn import AsyncFileSystem
 
+    with contextlib.suppress(ImportError):
+        from s3transfer.manager import TransferManager
+
 class CloudFileSystemType(type):
     fs: ModuleType = None
     fsa: ModuleType = None
     fs_name: str = None # gcsfs
     boto: ModuleType = None
-    s3t: Callable = None
+    s3t: 'TransferManager' = None
     tffs: 'tfFS' = None
 
     #s3t: 'boto3.s3.transfer.TransferManager' = None
@@ -65,10 +69,14 @@ class CloudFileSystemType(type):
             use_threads = True,
             max_concurrency = settings.core.num_workers,
         )
-        def create_s3t(self):
+        def create_s3t():
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
+
+        # @property
+        # def get_s3t(self):
+        #     return create_s3t()
         
-        cls.s3t = create_s3t
+        cls.s3t = property(create_s3t)
 
     
     def build_minio(cls, **auth_config):
@@ -102,10 +110,11 @@ class CloudFileSystemType(type):
             use_threads = True,
             max_concurrency = settings.core.num_workers
         )
-        def create_s3t(self):
+        def create_s3t():
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
         
-        cls.s3t = create_s3t
+        # cls.s3t = create_s3t
+        cls.s3t = property(create_s3t)
 
     def build_s3c(cls, **auth_config):
         LazyLib.import_lib('s3fs')
@@ -138,10 +147,11 @@ class CloudFileSystemType(type):
             use_threads = True,
             max_concurrency = settings.core.num_workers
         )
-        def create_s3t(self):
+        def create_s3t():
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
         
-        cls.s3t = create_s3t
+        # cls.s3t = create_s3t
+        cls.s3t = property(create_s3t)
 
 
     def build_r2(cls, **auth_config):
@@ -156,8 +166,8 @@ class CloudFileSystemType(type):
 
         if auth_config: settings.r2.update_auth(**auth_config)
         config = settings.r2.build_s3fs_config()
-        cls.fs = R2FileSystem(asynchronous=False, **config)
-        cls.fsa = rewrite_async_syntax(R2FileSystem(asynchronous=True, **config))
+        cls.fs: R2FileSystem = R2FileSystem(asynchronous=False, **config)
+        cls.fsa: R2FileSystem = rewrite_async_syntax(R2FileSystem(asynchronous=True, **config))
         # cls.fs = s3fs.S3FileSystem(asynchronous=False, **config)
         # cls.fsa = rewrite_async_syntax(s3fs.S3FileSystem(asynchronous=True, **config))
 
@@ -177,10 +187,15 @@ class CloudFileSystemType(type):
             use_threads = True,
             max_concurrency = settings.core.num_workers
         )
-        def create_s3t(self):
+        def create_s3t():
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
         
-        cls.s3t = create_s3t
+        s3tm = create_s3t()
+
+        # cls.s3t = create_s3t
+        cls.s3t = s3tm
+        cls.fs.s3tm = s3tm
+        cls.fsa.s3tm = s3tm
     
 
     def build_wasabi(cls, **auth_config):
@@ -215,10 +230,11 @@ class CloudFileSystemType(type):
             use_threads = True,
             max_concurrency = settings.core.num_workers
         )
-        def create_s3t(self):
+        def create_s3t():
             return s3transfer.create_transfer_manager(cls.boto, transfer_config)
         
-        cls.s3t = create_s3t
+        # cls.s3t = create_s3t
+        cls.s3t = property(create_s3t)
 
 
     def build_adlfs(cls, **auth_config):
@@ -356,7 +372,7 @@ class BaseAccessor(NormalAccessor):
     async_filesys: 'AsyncFileSystem' = CloudFileSystem.fsa
 
     boto: ClassVar = CloudFileSystem.boto
-    s3t: Callable = CloudFileSystem.s3t
+    s3t: 'TransferManager' = CloudFileSystem.s3t
     tffs: 'tfFS' = CloudFileSystem.tffs
     
     # Async Methods
