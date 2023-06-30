@@ -184,7 +184,7 @@ async def get_cloudfs_file(accessor: 'AccessorLike', path: Paths, mode: FileMode
     """
     Helper function to open a file from a filesystem
     """
-    if 'b' in mode and hasattr(accessor.async_filesys, 'open_async'):
+    if 'wb' in mode and hasattr(accessor.async_filesys, 'open_async'):
         asyncfile: 'AbstractAsyncStreamedFile' = await accessor.async_filesys.open_async(path, mode, **kwargs)
         if not hasattr(asyncfile, '_closed'):
             setattr(asyncfile, '_closed', False)

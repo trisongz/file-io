@@ -97,8 +97,8 @@ class R2FileSystem(s3fs.S3FileSystem):
     """
     # Since there seems to be a problem with the s3fs implementation of
     # multipart uploads, we are going to just use the max block size
-    # default_r2_block_size = 10 * 1024 * 1024
-    default_r2_block_size: int = 150 * 1024 * 1024 # 150MB
+    default_r2_block_size = 10 * 1024 * 1024 # 10MB
+    default_r2_write_block_size: int = 150 * 1024 * 1024 # 150MB
     default_r2_large_file_threshold: int = 500 * 1024 * 1024 # 500MB
     default_r2_max_size: int = 5 * 1024 * 1024 * 1024 # 5GB
 
@@ -116,12 +116,23 @@ class R2FileSystem(s3fs.S3FileSystem):
         
         for bucket_format in bucket_format_list:
             match = bucket_format.match(s3_path)
-            if match:
-                return match.group("bucket"), match.group("key")
+            if match: return match.group("bucket"), match.group("key")
         s3_components = s3_path.split("/", 1)
         bucket = s3_components[0]
         s3_key = s3_components[1] if len(s3_components) > 1 else ""
         return bucket, s3_key
+
+    def _get_block_size(
+        self,
+        mode: str = "rb",
+        block_size: Optional[int] = None,
+    ) -> int:
+        """
+        Get the block size for reading or writing a file
+        """
+        if block_size is None:  return self.default_r2_write_block_size if 'w' in mode else self.default_r2_block_size
+        return max(block_size, (self.default_r2_write_block_size if 'w' in mode else self.default_r2_block_size))
+
 
     def _open(
         self,
@@ -173,8 +184,7 @@ class R2FileSystem(s3fs.S3FileSystem):
             ServerSideEncryption.
         """
 
-        if block_size is None: block_size = self.default_r2_block_size
-        else: block_size = max(block_size, self.default_r2_block_size)
+        block_size = self._get_block_size(mode, block_size)
         if fill_cache is None: fill_cache = self.default_fill_cache
         if requester_pays is None: requester_pays = bool(self.req_kw)
         acl = acl or self.s3_additional_kwargs.get("ACL", "")
@@ -233,16 +243,10 @@ class R2FileSystem(s3fs.S3FileSystem):
     
     call_s3 = sync_wrapper(_call_s3)
 
-    async def open_async(self, path, mode="rb", **kwargs):
+    async def open_async(self, path, mode="rb", block_size: Optional[int] = None, **kwargs):
         if "b" not in mode: # or kwargs.get("compression"):
             raise ValueError
         _ = kwargs.pop("compression", None)
-        return R2AsyncStreamedFile(self, path, mode, **kwargs)
 
-    @property
-    def loop(self) -> asyncio.AbstractEventLoop:
-        # if self._pid != os.getpid():
-        #     raise RuntimeError("This class is not fork-safe")
-        if self._loop is None:
-            self._loop = asyncio.get_running_loop()
-        return self._loop
+        block_size = self._get_block_size(mode, block_size)
+        return R2AsyncStreamedFile(self, path, mode, block_size = block_size, **kwargs)

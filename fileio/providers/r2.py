@@ -69,7 +69,7 @@ class FileR2Path(CloudFileSystemPath):
         self._init()
         return self
     
-    def async_open(self, mode: FileMode = 'r', buffering: int = -1, encoding: Optional[str] = DEFAULT_ENCODING, errors: Optional[str] = ON_ERRORS, newline: Optional[str] = NEWLINE, block_size: int = 150 * 1024 * 1024, compression: str = None, **kwargs: Any) -> IterableAIOFile:
+    def async_open(self, mode: FileMode = 'r', buffering: int = -1, encoding: Optional[str] = DEFAULT_ENCODING, errors: Optional[str] = ON_ERRORS, newline: Optional[str] = NEWLINE, block_size: int = 10 * 1024 * 1024, compression: str = None, **kwargs: Any) -> IterableAIOFile:
         """
         Asyncronously Open the file pointed by this path and return a file object, as
         the built-in open() function does.

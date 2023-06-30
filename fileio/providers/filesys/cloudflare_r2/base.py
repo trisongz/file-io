@@ -232,69 +232,19 @@ Async Streamed File
 class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
     fs: 'R2FileSystem' = None
 
+    """
+    Note, this shouldn't be called for 
+    `rb` mode, since it doesnt work with
+    the loops for some reason.
+    """
+
     def __init__(self, fs: 'R2FileSystem', path, mode, encoding: Optional[str], errors: Optional[str], newline: Optional[str], buffering: Optional[int], **kwargs):
         super().__init__(fs, path, mode, **kwargs)
         self.r = None
         self.size = None
-        # self._loop = asyncio.get_running_loop() if fs.loop is None else fs.loop
-
-    def _fetch_range(self, start, end):
-        try:
-            return sync(
-                self.fs.loop,
-                _inner_fetch, 
-                self.fs,
-                self.bucket,
-                self.key,
-                self.version_id,
-                start,
-                end,
-                req_kw = self.req_kw or {},
-            )
-        
-        except OSError as ex:
-            if ex.args[0] == errno.EINVAL and "pre-conditions" in ex.args[1]:
-                raise FileExpired(filename=self.details["name"], e_tag=self.details.get("ETag")) from ex
-            else: raise ex
 
 
-
-        # return _sync_fetch_range(
-        #     self.fs,
-        #     self.bucket,
-        #     self.key,
-        #     self.version_id,
-        #     start,
-        #     end,
-        #     req_kw = self.req_kw,
-        # )
-
-    # async def _fetch_range(self, start, end):
-    #     try:
-    #         return await _inner_fetch(
-    #             self.fs,
-    #             self.bucket,
-    #             self.key,
-    #             self.version_id,
-    #             start,
-    #             end,
-    #             req_kw = self.req_kw or {},
-    #         )
-    #     except OSError as ex:
-    #         if ex.args[0] == errno.EINVAL and "pre-conditions" in ex.args[1]:
-    #             raise FileExpired(filename=self.details["name"], e_tag=self.details.get("ETag")) from ex
-    #         else: raise ex
-    
-
-    @property
-    def details(self):
-        if self._details is None:
-            self._details = self.fs.info(self.path)
-        return self._details
-    
-
-
-    async def _call_s3(self, method, *kwarglist, **kwargs):
+    async def _acall_s3(self, method, *kwarglist, **kwargs):
         """
         Filter out ACL for methods that we know will fail
         """
@@ -308,7 +258,7 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
         if self.autocommit and not self.append_block and self.tell() < self.blocksize: return
         _log(f"Initiate upload for {self}")
         self.parts = []
-        self.mpu = await self._call_s3(
+        self.mpu = await self._acall_s3(
             "create_multipart_upload",
             Bucket=self.bucket,
             Key=self.key,
@@ -318,7 +268,7 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
         if self.append_block:
             # use existing data in key when appending,
             # and block is big enough
-            out = await self._call_s3(
+            out = await self._acall_s3(
                 "upload_part_copy",
                 self.s3_additional_kwargs,
                 Bucket=self.bucket,
@@ -358,7 +308,7 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
 
             part = len(self.parts) + 1
             _log(f"Upload chunk {self}, {part}, {self.blocksize}/{data1_size}")
-            out = await self._call_s3(
+            out = await self._acall_s3(
                 "upload_part",
                 Bucket=bucket,
                 PartNumber=part,
@@ -383,7 +333,7 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
             _log(f"One-shot upload of {self}: {self.key}")
             self.buffer.seek(0)
             data = self.buffer.read()
-            write_result = await self._call_s3(
+            write_result = await self._acall_s3(
                 "put_object",
                 Key=self.key,
                 Bucket=self.bucket,
@@ -395,7 +345,7 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
             part_info = {"Parts": self.parts}
             _log(f"Complete multi-part upload for {self}: {self.key} {part_info}")
             try:
-                write_result = await self._call_s3(
+                write_result = await self._acall_s3(
                     "complete_multipart_upload",
                     Bucket=self.bucket,
                     Key=self.key,
@@ -504,7 +454,7 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
 
     async def _abort_mpu(self):
         if self.mpu:
-            await self._call_s3(
+            await self._acall_s3(
                 "abort_multipart_upload",
                 Bucket=self.bucket,
                 Key=self.key,
