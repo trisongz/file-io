@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import io
 import anyio
+import asyncio
 import contextlib
 import errno
 from typing import Optional, Dict, Any, Union, List, TYPE_CHECKING
 
 with contextlib.suppress(ImportError):
     import s3fs
-    from fsspec.asyn import AbstractAsyncStreamedFile
-    from s3fs.core import _inner_fetch
+    from fsspec.asyn import AbstractAsyncStreamedFile, sync, get_loop
+    from s3fs.core import _inner_fetch, _fetch_range as _sync_fetch_range
     from s3fs.utils import FileExpired
 
 if TYPE_CHECKING:
@@ -235,10 +236,13 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
         super().__init__(fs, path, mode, **kwargs)
         self.r = None
         self.size = None
+        # self._loop = asyncio.get_running_loop() if fs.loop is None else fs.loop
 
-    async def _fetch_range(self, start, end):
+    def _fetch_range(self, start, end):
         try:
-            return await _inner_fetch(
+            return sync(
+                self.fs.loop,
+                _inner_fetch, 
                 self.fs,
                 self.bucket,
                 self.key,
@@ -247,11 +251,48 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
                 end,
                 req_kw = self.req_kw or {},
             )
+        
         except OSError as ex:
             if ex.args[0] == errno.EINVAL and "pre-conditions" in ex.args[1]:
                 raise FileExpired(filename=self.details["name"], e_tag=self.details.get("ETag")) from ex
             else: raise ex
+
+
+
+        # return _sync_fetch_range(
+        #     self.fs,
+        #     self.bucket,
+        #     self.key,
+        #     self.version_id,
+        #     start,
+        #     end,
+        #     req_kw = self.req_kw,
+        # )
+
+    # async def _fetch_range(self, start, end):
+    #     try:
+    #         return await _inner_fetch(
+    #             self.fs,
+    #             self.bucket,
+    #             self.key,
+    #             self.version_id,
+    #             start,
+    #             end,
+    #             req_kw = self.req_kw or {},
+    #         )
+    #     except OSError as ex:
+    #         if ex.args[0] == errno.EINVAL and "pre-conditions" in ex.args[1]:
+    #             raise FileExpired(filename=self.details["name"], e_tag=self.details.get("ETag")) from ex
+    #         else: raise ex
     
+
+    @property
+    def details(self):
+        if self._details is None:
+            self._details = self.fs.info(self.path)
+        return self._details
+    
+
 
     async def _call_s3(self, method, *kwarglist, **kwargs):
         """

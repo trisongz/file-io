@@ -238,3 +238,11 @@ class R2FileSystem(s3fs.S3FileSystem):
             raise ValueError
         _ = kwargs.pop("compression", None)
         return R2AsyncStreamedFile(self, path, mode, **kwargs)
+
+    @property
+    def loop(self) -> asyncio.AbstractEventLoop:
+        # if self._pid != os.getpid():
+        #     raise RuntimeError("This class is not fork-safe")
+        if self._loop is None:
+            self._loop = asyncio.get_running_loop()
+        return self._loop
