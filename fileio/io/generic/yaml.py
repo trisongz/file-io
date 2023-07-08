@@ -23,8 +23,8 @@ if _yaml_available:
     class Yaml:
 
         @classmethod
-        def dump(cls, obj: Dict[Any, Any], stream: Any = None, indent = 2, *args, **kwargs) -> Any:
-            return yaml.dump(obj, stream = stream, indent = indent, *args, **kwargs)
+        def dump(cls, obj: Dict[Any, Any], stream: Any = None, *args, **kwargs) -> Any:
+            return yaml.dump(obj, stream = stream, *args, **kwargs)
 
         @classmethod
         def dumps(cls, obj: Union[List[Any], Dict[Any, Any]], stream: Any = None, *args, **kwargs) -> Any:
@@ -75,7 +75,7 @@ else:
 
     class Yaml:
         @classmethod
-        def dump(cls, obj: Dict[Any, Any], stream: Any = None, indent = 2, *args, **kwargs) -> Any:
+        def dump(cls, obj: Dict[Any, Any], stream: Any = None, *args, **kwargs) -> Any:
             raise ImportError("ruamel.yaml is not installed.")
 
         @classmethod

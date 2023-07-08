@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import hashlib
 import datetime
-
+import functools
+import asyncio
 from typing import ClassVar
 from fsspec.callbacks import Callback
 from pydantic.types import ByteSize
@@ -1549,6 +1550,62 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         for name in names:
             if name in {'.', '..'}: continue
         yield self._make_child_relpath(name)
+
+    async def async_ls(
+        self,
+        recursive: bool = False,
+        detail: Optional[bool] = False,
+        versions: Optional[bool] = False,
+        refresh: Optional[bool] = False,
+        as_path: Optional[bool] = True,
+        files_only: Optional[bool] = True,
+        prettify: Optional[bool] = True,
+        **kwargs,
+    ) -> Union[List['CloudFileSystemPath'], List[Dict[str, Any]]]:
+        """
+        Return a list of the files in this directory.
+        """
+        
+        ls_partial = functools.partial(self.afilesys._ls, detail=True, versions=versions, refresh=refresh)
+
+        async def _ls(path: Dict[str, Any]):
+            """
+            Inner function to handle recursive ls
+            """
+            ps = []
+            if path.get('type', path.get('StorageClass', '')).lower() == 'directory' \
+                and recursive:
+                new_paths = await ls_partial(path['Key'])
+                results = await asyncio.gather(*[_ls(p) for p in new_paths])
+                for result in results:
+                    ps.extend(result)
+                if not files_only: ps.append(path)
+            if files_only and path.get('type', path.get('StorageClass', '')).lower() != 'directory':
+                ps.append(path)
+            return ps
+
+        from pydantic.types import ByteSize
+        from lazyops.utils.ahelpers import amap_v2
+        paths: List[Dict[str, Any]] = await ls_partial(self._cloudpath)
+        all_paths = []
+        async for path in amap_v2(_ls, paths):
+            all_paths.extend(path)
+
+        if detail: 
+            for p in all_paths:
+                p['Key'] = f'{self._prefix}://{p["Key"]}'
+                if prettify: p['SizePretty'] = ByteSize.validate(p['Size']).human_readable()
+            if as_path:
+                p['File'] = type(self)(p['Key'])
+            return all_paths
+        final_paths = []
+        for path in all_paths:
+            if as_path: 
+                path_str = f'{self._prefix}://{path["Key"]}'
+                path = type(self)(path_str)
+            final_paths.append(path)
+        return final_paths
+        
 
     def _raise_closed(self):
         raise ValueError("I/O operation on closed path")
