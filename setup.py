@@ -22,6 +22,7 @@ requirements = [
     'dill',
     'frozendict',
     'aiohttpx',
+    'typer',
 ]
 
 extras = {
@@ -37,7 +38,11 @@ args = {
     'install_requires': requirements,
     'include_package_data': True,
     'long_description': root.joinpath('README.md').read_text(encoding='utf-8'),
-    'entry_points': {}
+    'entry_points': {
+        'console_scripts': [
+            'fileio = fileio.cli:cmd',
+        ],
+    }
 }
 
 if extras: args['extras_require'] = extras
@@ -54,7 +59,7 @@ setup(
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Software Development :: Libraries',
     ],
     **args
