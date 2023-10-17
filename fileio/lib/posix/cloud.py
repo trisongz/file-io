@@ -1194,13 +1194,13 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         return await self._accessor.async_stat(self._cloudpath)
 
-    def info(self):
+    def info(self) -> Dict[str, Union[str, int, float, datetime.datetime, datetime.timedelta, List[str], Any]]:
         """
         Return the result of the info() system call on this path, like
         """
         return self._accessor.info(self._cloudpath)
 
-    async def async_info(self):
+    async def async_info(self) -> Dict[str, Union[str, int, float, datetime.datetime, datetime.timedelta, List[str], Any]]:
         """
         Return the result of the info() system call on this path, like
         os.stat() does.
