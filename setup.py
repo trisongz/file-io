@@ -5,21 +5,24 @@ from setuptools import setup, find_packages
 if sys.version_info.major != 3:
     raise RuntimeError("This package requires Python 3+")
 
-version = '0.4.6'
 pkg_name = 'file-io'
 gitrepo = 'trisongz/file-io'
+
 root = Path(__file__).parent
+version = root.joinpath('fileio/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
+
 
 requirements = [
     'anyio',
     'aiofile',
     #'aiopath', # remove deps as 3.10 vs 3.9 is different
     'fsspec',
-    'loguru>=0.7.0,<0.8.0',
+    'loguru',
     'pydantic',
     'dill',
     'frozendict',
     'aiohttpx',
+    'typer',
 ]
 
 extras = {
@@ -35,7 +38,11 @@ args = {
     'install_requires': requirements,
     'include_package_data': True,
     'long_description': root.joinpath('README.md').read_text(encoding='utf-8'),
-    'entry_points': {}
+    'entry_points': {
+        'console_scripts': [
+            'fileio = fileio.cli:cmd',
+        ],
+    }
 }
 
 if extras: args['extras_require'] = extras
@@ -52,7 +59,7 @@ setup(
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Software Development :: Libraries',
     ],
     **args

@@ -1,21 +1,62 @@
-from __future__ import absolute_import
+# from __future__ import absolute_import
 
 import os
-from fileio import types
+# from . import types
+from .lib.base import pathlib
+from .types import (
+    PathLike,
+    FileInfo,
+    PreparedFile,
+    ParsedFile,
+)
 
-from fileio.core.imports import pathlib
-from fileio.core.generic import *
+from .lib.types import (
+    File,
+    FileLike,
+    FileType,
+    FileListType,
+    FileSysLike,
+)
 
-from fileio.core import flavours
-from fileio.core import base
-from fileio.core import generic
+# from .types import (
+#     File,
+#     FileLike,
+#     FileType,
+#     FileListType,
+#     PathLike,
+#     FileSysLike,
+#     FileInfo,
+#     PreparedFile,
+#     ParsedFile,
+# )
+from .utils import settings
 
-from fileio import providers
+__all__ = [
+    'pathlib',
+    'File',
+    'FileLike',
+    'FileType',
+    'FileListType',
+    'PathLike',
+    'FileSysLike',
+    'FileInfo',
+    'PreparedFile',
+    'ParsedFile',
+    'settings',
+]
+# from fileio.core.imports import pathlib
+# from fileio.core.generic import *
 
-from fileio.utils import settings
-from fileio.core.types import File, FileLike, FileType, FileListType
+# from fileio.core import flavours
+# from fileio.core import base
+# from fileio.core import generic
 
-from fileio.types.etc import ParsedFile, PreparedFile
+# from fileio import providers
+
+# from fileio.utils import settings
+# from fileio.core.types import File, FileLike, FileType, FileListType
+
+# from fileio.types.etc import ParsedFile, PreparedFile
 
 # from fileio.converters.base import BaseConverter
 # PreparedFile.update_forward_refs()
