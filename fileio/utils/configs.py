@@ -2,11 +2,11 @@ import os
 import json
 import pathlib
 import multiprocessing as mp
-from pydantic import BaseSettings, validator, root_validator
 
 from typing import Optional, Dict, Any, Union
 from fileio.utils.logs import default_logger as logger
 from fileio.types.classprops import lazyproperty
+from fileio.types.compat import BaseSettings, validator, root_validator
 
 class CoreSettings(BaseSettings):
 
@@ -43,18 +43,25 @@ class CoreSettings(BaseSettings):
     
     @lazyproperty
     def in_colab(self) -> bool:
-        try:
-            from google.colab import drive
-            return True
-        except ImportError:
-            return False
+        """
+        Checks if the code is running in Google Colab
+        """
+        from fileio.utils.lazylib import LazyLib
+        return LazyLib.is_available('google.colab')
+
     
     def set_env(self):
+        """
+        Sets the environment variables for boto
+        """
         if self.boto_config_exists:
             os.environ["BOTO_CONFIG"] = self.boto_config_path.as_posix()
             os.environ["BOTO_PATH"] = self.boto_config_path.as_posix()
     
     def update_config(self, **kwargs):
+        """
+        Updates the settings
+        """
         for k, v in kwargs.items():
             if not hasattr(self, k):  continue
             if isinstance(getattr(self, k), pathlib.Path):
@@ -687,7 +694,7 @@ class WasabiS3Settings(BaseSettings):
         return config
 
 
-class Settings(BaseSettings):
+class FileIOSettings(BaseSettings):
 
     read_chunk_size: Optional[int] = 1024 * 64 # 64KB
     url_chunk_size: Optional[int] = 1024 * 128 # 128KB
@@ -699,42 +706,72 @@ class Settings(BaseSettings):
 
     @lazyproperty
     def core(self) -> CoreSettings:
+        """
+        Returns the core settings
+        """
         return CoreSettings()
     
     @lazyproperty
     def aws(self) -> AwsSettings:
+        """
+        Returns the aws settings
+        """
         return AwsSettings()
 
     @lazyproperty
     def gcp(self) -> GcpSettings:
+        """
+        Returns the gcp settings
+        """
         return GcpSettings()
 
     @lazyproperty
     def azure(self) -> AzureSettings:
+        """
+        Returns the azure settings
+        """
         return AzureSettings()
 
     @lazyproperty
     def minio(self) -> MinioSettings:
+        """
+        Returns the minio settings
+        """
         return MinioSettings()
     
     @lazyproperty
     def s3_compat(self) -> S3CompatSettings:
+        """
+        Returns the s3_compat settings
+        """
         return S3CompatSettings()
     
     @lazyproperty
     def r2(self) -> CloudflareR2Settings:
+        """
+        Returns the r2 settings
+        """
         return CloudflareR2Settings()
     
     @lazyproperty
     def wasabi(self) -> WasabiS3Settings:
+        """
+        Returns the wasabi settings
+        """
         return WasabiS3Settings()
     
     @lazyproperty
     def github(self) -> GithubSettings:
+        """
+        Returns the github settings
+        """
         return GithubSettings()
     
     @lazyproperty
     def huggingface(self) -> HuggingfaceSettings:
+        """
+        Returns the huggingface settings
+        """
         return HuggingfaceSettings()
 
     def create_adc(
@@ -752,6 +789,9 @@ class Settings(BaseSettings):
         self.gcp.google_application_credentials = path
 
     def get_boto_values(self):
+        """
+        Returns the boto config values
+        """
         t = "[Credentials]\n"
         if self.aws.aws_access_key_id:
             t += f"aws_access_key_id = {self.aws.aws_access_key_id}\n"
@@ -772,6 +812,9 @@ class Settings(BaseSettings):
         overwrite: bool = False, 
         **kwargs
     ):
+        """
+        Writes the boto config file to the path specified in the boto_config_path
+        """
         if not self.core.boto_config_exists or overwrite:
             logger.info(f"Writing boto config to {self.core.boto_config_path.as_posix()}")
             self.core.boto_config_path.write_text(self.get_boto_values())
@@ -786,6 +829,9 @@ class Settings(BaseSettings):
             else: setattr(self, k, v)
 
     def set_env(self):
+        """
+        Calls the set_env method on all the settings
+        """
         self.aws.set_env()
         self.gcp.set_env()
         self.minio.set_env()
@@ -796,6 +842,9 @@ class Settings(BaseSettings):
         self.wasabi.set_env()
 
     def update_auth(self, update_fs: bool = True, **config):
+        """
+        Updates the auth settings and optionally updates the fs
+        """
         self.update_config(**config)
         self.set_env()
 
@@ -825,9 +874,33 @@ class Settings(BaseSettings):
                 FileSysManager.get_accessor('wasabi', _reset = True)
     
 
-    class Config(BaseSettings.Config):
+    class Config:
         env_prefix = "FILEIO_"
         case_sensitive = False
-    
 
-settings = Settings()
+
+_fileio_settings: Optional[FileIOSettings] = None
+
+def get_fileio_settings(**kwargs) -> FileIOSettings:
+    """
+    Returns the fileio settings
+    """
+    global _fileio_settings
+    if _fileio_settings is None:
+        _fileio_settings = FileIOSettings()
+    if kwargs:
+        _fileio_settings.update_config(**kwargs)
+    return _fileio_settings
+
+class ProxySettings:
+    def __init__(self):
+        self._settings = None
+
+    def __getattr__(self, name):
+        if self._settings is None:
+            self._settings = get_fileio_settings()
+        return getattr(self._settings, name)
+
+settings: FileIOSettings = ProxySettings()
+
+

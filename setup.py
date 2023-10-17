@@ -19,6 +19,7 @@ requirements = [
     'fsspec',
     'loguru',
     'pydantic',
+    'pydantic-settings',
     'dill',
     'frozendict',
     'aiohttpx',

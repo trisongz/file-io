@@ -28,7 +28,7 @@ from fileio.types.classprops import lazyproperty
 from fileio.types.options import LoadMode
 from fileio.utils.logs import logger
 from fileio.utils.pooler import ThreadPooler
-from typing import Union, Any, TypeVar, List, Optional, Callable, Dict, Type, Tuple, TYPE_CHECKING
+from typing import Union, Any, TypeVar, List, Optional, Callable, Dict, Type, Tuple, cast, TYPE_CHECKING
 
 PathLikeT = Union[
     FilePurePath,
@@ -357,6 +357,8 @@ def get_filelike(path: FileType) -> FileLike:
 
 # FileT = TypeVar('FileT', bound = FileLike)
 
+from fileio.types.compat import PYD_VERSION
+
 class File(CloudFileSystemPath):
     
     # __metaclass__ = Type[FileLike]
@@ -442,7 +444,6 @@ class File(CloudFileSystemPath):
             Yaml.loads,
             await _file.async_read_text()
         )
-        # return Yaml.loads(await _file.async_read_text())
     
     @classmethod
     async def async_load_text(
@@ -466,7 +467,6 @@ class File(CloudFileSystemPath):
             Dill.loads,
             await _file.async_read_bytes()
         )
-        # return Dill.loads(await _file.async_read_bytes())
     
     @classmethod
     async def async_load_csv(
@@ -629,20 +629,62 @@ class File(CloudFileSystemPath):
         raise ValueError(f'Unknown file extension: {_file.extension}')
     
     # Pydantic methods
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+    if PYD_VERSION == 2:
+        from pydantic_core import core_schema
+        from pydantic.annotated_handlers import GetCoreSchemaHandler, GetJsonSchemaHandler
+        from pydantic.json_schema import JsonSchemaValue
 
-    @classmethod
-    def validate(cls, v: Union[FileLike, Any]) -> FileLike:
-        return get_filelike(v) if v is not None else None
-    
-    @classmethod
-    def __modify_schema__(cls, field_schema: Dict[str, Any]) -> None:
-        field_schema.update(
-            type='string',
-            format='binary',
-        )
+        def __get_pydantic_json_schema__(
+            self, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+        ) -> JsonSchemaValue:
+            
+            field_schema = handler(core_schema)
+            field_schema.update(format = 'path', type = 'string')
+            return field_schema
+
+        @classmethod
+        def __get_pydantic_core_schema__(
+            cls, 
+            source: type[Any], 
+            handler: GetCoreSchemaHandler
+        ) -> core_schema.CoreSchema:
+            """
+            Get the Pydantic CoreSchema for the given source
+            """
+            from pydantic_core import core_schema
+            return core_schema.with_info_plain_validator_function(
+                cls._validate,
+                serialization = core_schema.to_string_ser_schema(),
+            )
+        
+
+        @classmethod
+        def _validate(cls, __input_value: Any, _: core_schema.ValidationInfo) -> FileLike:
+            """
+            Validator for Pydantic v2
+            """
+            return get_filelike(__input_value) if __input_value is not None else None
+        
+
+        def __hash__(self) -> int:
+            return hash(self.as_posix())
+
+
+    else:
+        @classmethod
+        def __get_validators__(cls):
+            yield cls.validate
+
+        @classmethod
+        def validate(cls, v: Union[FileLike, Any]) -> FileLike:
+            return get_filelike(v) if v is not None else None
+        
+        @classmethod
+        def __modify_schema__(cls, field_schema: Dict[str, Any]) -> None:
+            field_schema.update(
+                type='string',
+                format='binary',
+            )
     
 
 

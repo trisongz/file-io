@@ -3,19 +3,20 @@ import asyncio
 from concurrent import futures
 from functools import wraps, partial
 from typing import Callable, Any, Awaitable
-from fileio.utils.configs import settings
+# from fileio.utils.configs import settings
+from fileio.utils.pooler import ThreadPooler
 
 CoroutineResult = Awaitable[Any]
 CoroutineFunction = Callable[..., CoroutineResult]
 CoroutineMethod = Callable[..., CoroutineResult]
 
-_pool = futures.ThreadPoolExecutor(max_workers = settings.core.num_workers)
+# _pool = futures.ThreadPoolExecutor(max_workers = settings.core.num_workers)
 
 async def to_thread(func: Callable, *args, **kwargs) -> Any:
     # anyio's run_sync() doesn't support passing kwargs
     func_kwargs = partial(func, *args, **kwargs)
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_pool, func_kwargs)
+    return await loop.run_in_executor(ThreadPooler.get_pool(), func_kwargs)
 
 def func_to_async_func(func: Callable) -> CoroutineFunction:
     @wraps(func)

@@ -1,7 +1,6 @@
 # handle posix stat stuff
 import os
 import sys
-#import stat
 import time
 import inspect
 import random
@@ -11,8 +10,6 @@ import hashlib
 import functools
 import contextlib
 import datetime
-#from datetime import datetime
-#from urllib.parse import quote
 from email.utils import formatdate
 from mimetypes import guess_type as mimetypes_guess_type
 

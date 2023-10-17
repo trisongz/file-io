@@ -1,12 +1,25 @@
+import os
+import sys
+import enum
 import anyio
 import asyncio
 import functools
 import subprocess
+
 from concurrent import futures
 
-from typing import Callable, Coroutine, Any, Union, List
+from typing import Callable, Coroutine, Any, Union, List, Awaitable, Optional, TypeVar, AsyncGenerator, AsyncIterable, AsyncIterator, Iterable
 from anyio._core._eventloop import threadlocals
-from lazyops.utils.helpers import is_coro_func
+from .helpers import is_coro_func
+
+if sys.version_info < (3, 10):
+    # Add aiter and anext to asyncio
+    def aiter(it: AsyncIterable) -> Any:
+        return it.__aiter__()
+    
+    def anext(it: AsyncIterator) -> Any:
+        return it.__anext__()
+
 
 class ThreadPooler:
     pool: futures.ThreadPoolExecutor = None
@@ -18,8 +31,8 @@ class ThreadPooler:
     @classmethod
     def get_pool(cls) -> futures.ThreadPoolExecutor:
         if cls.pool is None:
-            from fileio.utils import settings
-            cls.pool = futures.ThreadPoolExecutor(max_workers = settings.num_workers)
+            from fileio.utils.configs import get_fileio_settings
+            cls.pool = futures.ThreadPoolExecutor(max_workers = get_fileio_settings().num_workers)
         return cls.pool
 
 
@@ -83,3 +96,138 @@ class ThreadPooler:
         if not output_only: return p
         stdout, _ = await p.communicate()
         return stdout.decode(encoding = output_encoding, errors = output_errors).strip()
+
+
+    @classmethod
+    async def asyncish(cls, func: Callable, *args, **kwargs):
+        """
+        Runs a Function as an Async Function if it is an Async Function
+        otherwise wraps it around `run_async`
+        """
+        if cls.is_coro(func): return await func(*args, **kwargs)
+        return await cls.run_async(func, *args, **kwargs)
+
+
+
+def ensure_coro(
+    func: Callable[..., Any]
+) -> Callable[..., Awaitable[Any]]:
+    """
+    Ensure that the function is a coroutine
+    """
+    if asyncio.iscoroutinefunction(func): return func
+    @functools.wraps(func)
+    async def inner(*args, **kwargs):
+        return await ThreadPooler.asyncish(func, *args, **kwargs)
+    return inner
+
+class ReturnWhenType(str, enum.Enum):
+    """
+    Return When Type
+    """
+    FIRST_COMPLETED = "FIRST_COMPLETED"
+    FIRST_EXCEPTION = "FIRST_EXCEPTION"
+    ALL_COMPLETED = "ALL_COMPLETED"
+
+    @property
+    def val(self) -> Union[asyncio.FIRST_COMPLETED, asyncio.FIRST_EXCEPTION, asyncio.ALL_COMPLETED]:
+        """
+        Get the value of the return when type
+        """
+        return getattr(asyncio, self.value)
+
+
+_concurrency_limit: Optional[int] = None
+
+def set_concurrency_limit(
+    limit: Optional[int] = None
+):
+    """
+    Set the concurrency limit
+    """
+    global _concurrency_limit
+    if limit is None: limit = os.cpu_count() * 4
+    _concurrency_limit = limit
+
+def get_concurrency_limit() -> Optional[int]:
+    """
+    Get the concurrency limit
+    """
+    if _concurrency_limit is None: set_concurrency_limit()
+    return _concurrency_limit
+
+
+async def limit_concurrency(
+    mapped_iterable: Union[Callable[[], Awaitable[Any]], Awaitable[Any], Coroutine[Any, Any, Any], Callable[[], Any]],
+    limit: Optional[int] = None,
+    return_when: Optional[ReturnWhenType] = ReturnWhenType.FIRST_COMPLETED,
+):
+    """
+    Limit the concurrency of an iterable
+
+    Args:
+        mapped_iterable (Union[Callable[[], Awaitable[Any]], Awaitable[Any], Coroutine[Any, Any, Any], Callable[[], Any]]): The iterable to limit the concurrency of
+        limit (Optional[int], optional): The limit of the concurrency. Defaults to None.
+        return_when (Optional[ReturnWhenType], optional): The return when type. Defaults to ReturnWhenType.FIRST_COMPLETED.
+    
+    Yields:
+        [type]: [description]
+    """
+    try:
+        iterable = aiter(mapped_iterable)
+        is_async = True
+    except (TypeError, AttributeError):
+        iterable = iter(mapped_iterable)
+        is_async = False
+    
+    iterable_ended: bool = False
+    pending = set()
+    limit = get_concurrency_limit() if limit is None else limit
+    return_when = ReturnWhenType(return_when) if isinstance(return_when, str) else return_when
+
+    while pending or not iterable_ended:
+        while len(pending) < limit and not iterable_ended:
+            try:
+                iter_item = await anext(iterable) if is_async else next(iterable)
+            except StopAsyncIteration if is_async else StopIteration:
+                iterable_ended = True
+            else:
+                pending.add(asyncio.ensure_future(iter_item))
+
+        if not pending: return
+        done, pending = await asyncio.wait(
+            pending, 
+            return_when = return_when.val
+        )
+        while done: yield done.pop()
+
+RT = TypeVar("RT")
+
+async def async_map(
+    func: Callable[..., Awaitable[Any]],
+    iterable: Iterable[Any], 
+    *args,
+    limit: Optional[int] = None,
+    return_when: Optional[ReturnWhenType] = ReturnWhenType.FIRST_COMPLETED,
+    **kwargs,
+) -> AsyncGenerator[RT, None]:
+    """
+    Async Map of a function with args and kwargs
+
+    Args:
+        func (Callable[..., Awaitable[Any]]): The function to map
+        iterable (Iterable[Any]): The iterable to map
+        limit (Optional[int], optional): The limit of the concurrency. Defaults to None.
+        return_when (Optional[ReturnWhenType], optional): The return when type. Defaults to ReturnWhenType.FIRST_COMPLETED.
+    
+    Yields:
+        [type]: [description]
+    """
+    func = ensure_coro(func)
+    partial = functools.partial(func, *args, **kwargs)
+    try:
+        mapped_iterable = map(partial, iterable)
+    except TypeError:
+        mapped_iterable = (partial(x) async for x in iterable)
+    async for task in limit_concurrency(mapped_iterable, limit = limit, return_when = return_when):
+        yield await task

@@ -11,7 +11,7 @@ from fileio.lib.types import File, FileLike
 from fileio.types.etc import ParsedFile, PreparedFile
 from fileio.utils import logger
 from fileio.utils.pooler import ThreadPooler
-from fileio.utils.configs import settings
+# from fileio.utils.configs import settings
 from fileio.utils.ops import (
     async_checksum_file, 
     checksum_file,
@@ -39,7 +39,7 @@ class BaseConverter(ABC):
 
     method: Optional[str] = None
     enabled: Optional[bool] = None
-    progress_bar: Optional[bool] = (settings.enable_progress_bar and _tqdm_avail)
+    progress_bar: Optional[bool] = None
     raise_errors: Optional[bool] = True
 
     def __init__(
@@ -73,6 +73,9 @@ class BaseConverter(ABC):
         self.remove_numeric_tables = remove_numeric_tables
         self.valid_languages = valid_languages
         self.id_hash_keys = id_hash_keys
+        if progress_bar is None:
+            from fileio.utils.configs import get_fileio_settings
+            progress_bar = get_fileio_settings().enable_progress_bar and _tqdm_avail
         if progress_bar is not None: self.progress_bar = progress_bar
         if raise_errors is not None: self.raise_errors = raise_errors
 

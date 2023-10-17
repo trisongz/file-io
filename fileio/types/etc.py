@@ -2,7 +2,7 @@
 import datetime
 import contextlib
 from typing import Any, Dict, List, Optional, Union, TYPE_CHECKING
-from pydantic import BaseModel, Field, validator
+from .compat import BaseModel, Field, validator, get_pyd_dict
 from .classprops import lazyproperty
 
 
@@ -23,8 +23,8 @@ class FileInfo(BaseModel):
     class Config:
         allow_arbitrary_types = True
 
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
+    def dict(self, **kwargs):
+        d = get_pyd_dict(self, **kwargs)
         if d['path']: d['path'] = self.path.as_posix()
         return d
 
@@ -109,8 +109,8 @@ class FileInfo(BaseModel):
     class Config:
         allow_arbitrary_types = True
 
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
+    def dict(self, **kwargs):
+        d = get_pyd_dict(self, **kwargs)
         if d['path']: d['path'] = self.path.as_posix()
         return d
 
@@ -457,8 +457,8 @@ class ParsedFile(BaseModel):
     def file_info(self) -> FileInfo:
         return self.file.file_info
 
-    def dict(self, *args, **kwargs):
-        d = super().dict(*args, **kwargs)
+    def dict(self, **kwargs):
+        d = get_pyd_dict(self, **kwargs)
         if d['file']: d['file'] = self.file.dict()
         return d
 

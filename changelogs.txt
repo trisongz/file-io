@@ -1,3 +1,21 @@
+Oct 17, 2023, v0.5.01rc0 - Major Refactor
+
+- Fully support Pydantic v1/v2 in Settings and BaseModels
+    - Type annotation still fully supported
+
+- Implement lazy initialization of settings
+
+- Remove `lazyops` dependencies
+
+- Implement reworked `cloudflare` api
+
+- Planned deprecation to move `fileio.lib.types.File` to `fileio.file.File`
+
+- TODO:
+    - Implement atomic read/write
+
+---
+
 Jan 13, 2022 v0.4.4
 - Modify logic for `glob` and `rglob` to return list instead of iterables.
 - Resolve logic for local paths for `listdir` `glob` and `rglob` to return list instead of iterables.

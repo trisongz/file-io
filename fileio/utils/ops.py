@@ -8,7 +8,6 @@ import contextlib
 
 from typing import Callable, Dict, Any, Tuple, Optional, TYPE_CHECKING
 from .helpers import timed_cache
-from .configs import settings
 
 if TYPE_CHECKING:
     from fileio.lib.types import FileLike
@@ -22,7 +21,7 @@ def get_url_file_name(url: str):
     url = url.split("?")[0]
     return os.path.basename(url)
 
-@timed_cache(secs = settings.checksum_cache_ttl)
+@timed_cache(secs = 60 * 60 * 24 * 1)
 def checksum_file(path: 'FileLike', chunk_size: Optional[int] = None) -> str:
     """
     Takes the uploaded file from the request and performs
@@ -32,8 +31,9 @@ def checksum_file(path: 'FileLike', chunk_size: Optional[int] = None) -> str:
     :param chunk_size: The size of the chunks to read from the file (default is 64kb)
     """
     from fileio.lib.types import File
-
-    if not chunk_size: chunk_size = settings.read_chunk_size
+    if not chunk_size: 
+        from fileio.utils.configs import get_fileio_settings
+        chunk_size = get_fileio_settings().read_chunk_size
     path = File(path)
     sha256_hash = hashlib.sha256()
     with path.open('rb') as f:
@@ -44,7 +44,7 @@ def checksum_file(path: 'FileLike', chunk_size: Optional[int] = None) -> str:
     return checksum
 
 
-@timed_cache(secs = settings.checksum_cache_ttl)
+@timed_cache(secs = 60 * 60 * 24 * 1)
 async def async_checksum_file(path: 'FileLike', chunk_size: Optional[int] = None) -> str:
     """
     [Async]
@@ -55,8 +55,9 @@ async def async_checksum_file(path: 'FileLike', chunk_size: Optional[int] = None
     :param chunk_size: The size of the chunks to read from the file (default is 64kb)
     """
     from fileio.lib.types import File
-
-    if not chunk_size: chunk_size = settings.read_chunk_size
+    if not chunk_size: 
+        from fileio.utils.configs import get_fileio_settings
+        chunk_size = get_fileio_settings().read_chunk_size
     path = File(path)
     sha256_hash = hashlib.sha256()
     async with path.async_open('rb') as f:
@@ -89,7 +90,9 @@ def fetch_file_from_url(
     from fileio.lib.types import File
 
     assert '://' in url, f'Invalid URL: {url}'
-    if not chunk_size: chunk_size = settings.url_chunk_size
+    if not chunk_size: 
+        from fileio.utils.configs import get_fileio_settings
+        chunk_size = get_fileio_settings().url_chunk_size
     if not path and not filename and not directory:
         path = File.get_tempfile()
     elif filename or directory:
@@ -123,8 +126,9 @@ async def async_fetch_file_from_url(
     from fileio.lib.types import File
 
     assert '://' in url, f'Invalid URL: {url}'
-
-    if not chunk_size: chunk_size = settings.url_chunk_size
+    if not chunk_size: 
+        from fileio.utils.configs import get_fileio_settings
+        chunk_size = get_fileio_settings().url_chunk_size
     if not path and not filename and not directory:
         path = File.get_tempfile()
     elif filename or directory:
@@ -143,11 +147,11 @@ async def async_fetch_file_from_url(
     return path
 
 
+
 try:
     from pydantic.json import ENCODERS_BY_TYPE
 except ImportError:
     ENCODERS_BY_TYPE = None 
-
 
 def register_pydantic_type(obj, t):
     """

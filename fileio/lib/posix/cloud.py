@@ -311,6 +311,9 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
 
     @property
     def exists_(self) -> bool:
+        """
+        Returns True if path exists
+        """
         return self.exists()
 
     @property
@@ -1585,10 +1588,10 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             return ps
 
         from pydantic.types import ByteSize
-        from lazyops.utils.ahelpers import amap_v2
+        from fileio.utils.pooler import async_map
         paths: List[Dict[str, Any]] = await ls_partial(self._cloudpath)
         all_paths = []
-        async for path in amap_v2(_ls, paths):
+        async for path in async_map(_ls, paths):
             all_paths.extend(path)
 
         if detail: 

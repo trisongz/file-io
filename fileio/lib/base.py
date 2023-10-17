@@ -8,11 +8,13 @@ from hashlib import md5
 from pydantic.types import ByteSize
 from fileio.types.common import *
 from fileio.types.classprops import lazyproperty
+
 from fileio.lib.core import *
 from fileio.lib.aiopath.selectors import _make_selector
 from fileio.lib.aiopath.scandir import EntryWrapper, scandir_async, _scandir_results
 from fileio.lib.flavours import _pathz_windows_flavour, _pathz_posix_flavour
 from fileio.utils import get_file_info
+
 import fileio.lib.exceptions as exceptions
 
 if TYPE_CHECKING:

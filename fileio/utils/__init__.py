@@ -4,6 +4,7 @@ from fileio.utils.logs import default_logger as logger
 from fileio.utils.lazylib import LazyLib
 
 from fileio.utils.helpers import *
+from fileio.utils.configs import get_fileio_settings
 from fileio.utils.configs import settings
 
 from fileio.utils.ops import (

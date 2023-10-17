@@ -41,7 +41,7 @@ import os
 import sys
 from typing import Any, AnyStr, Dict, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 from types import ModuleType
-from pydantic import BaseModel
+from .compat import BaseModel
 
 try:
     from typing import Protocol

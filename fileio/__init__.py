@@ -29,7 +29,7 @@ from .lib.types import (
 #     PreparedFile,
 #     ParsedFile,
 # )
-from .utils import settings
+from .utils import get_fileio_settings, settings
 
 __all__ = [
     'pathlib',
@@ -42,7 +42,8 @@ __all__ = [
     'FileInfo',
     'PreparedFile',
     'ParsedFile',
-    'settings',
+    'get_fileio_settings',
+    # 'settings',
 ]
 # from fileio.core.imports import pathlib
 # from fileio.core.generic import *

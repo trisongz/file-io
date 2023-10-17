@@ -14,12 +14,6 @@ import pathlib
 from typing import Any, Union, Dict
 from types import ModuleType
 
-
-try:
-    from google.colab import drive
-    _is_colab = True
-except ImportError: _is_colab = False
-
 def get_variable_separator():
     """
     Returns the environment variable separator for the current platform.
@@ -48,7 +42,7 @@ class LibModuleType(type):
     @classmethod
     def is_available(cls, library: str) -> bool:
         """ Checks whether a Python Library is available."""
-        if library == 'colab': return _is_colab
+        if library == 'colab':  library = 'google.colab'
         try:
             _ = pkg_resources.get_distribution(library)
             return True
@@ -162,7 +156,7 @@ class LibModuleType(type):
             if not raise_error: return ""
             raise e
 
-    def __getattr__(cls, key):
+    def __getattr__(cls, key: str):
         """
             Lib.is_avail_tensorflow -> bool
             Lib.tensorflow -> sys.modules[tensorflow] or None

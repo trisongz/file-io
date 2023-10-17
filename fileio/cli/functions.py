@@ -8,7 +8,7 @@ import typer
 import base64
 from pydantic.types import ByteSize
 from fileio.lib.types import File
-from lazyops.utils.helpers import timer
+from fileio.utils.helpers import timer
 from typing import Optional, List, Union, Dict, Any, Callable, TYPE_CHECKING
 
 async def fetch_file(
