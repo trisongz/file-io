@@ -79,6 +79,7 @@ class AwsSettings(BaseSettings):
     aws_region: Optional[str] = "us-east-1"
     set_s3_endpoint: Optional[bool] = False
     s3_config: Optional[Union[str, Dict[str, Any]]] = None
+    s3_fs_config: Optional[Union[str, Dict[str, Any]]] = None
 
     class Config:
         env_prefix: str = ""
@@ -125,7 +126,9 @@ class AwsSettings(BaseSettings):
         """
         Builds the s3fs config dict
         """
-        config = {}
+        config = {
+            **(self.s3_fs_config or {})
+        }
         if self.aws_access_key_id:
             config["key"] = self.aws_access_key_id
             # config['aws_access_key_id'] = self.aws_access_key_id
@@ -140,7 +143,6 @@ class AwsSettings(BaseSettings):
             config['client_kwargs'] = {'endpoint_url': self.s3_endpoint, 'region_name': self.aws_region}
         if self.s3_config:
             config['config_kwargs'] = self.s3_config
-        
         return config
 
 
@@ -152,6 +154,7 @@ class GcpSettings(BaseSettings):
 
     gcs_client_config: Optional[Union[str, Dict[str, Any]]] = None
     gcs_config: Optional[Union[str, Dict[str, Any]]] = None
+    gcs_fs_config: Optional[Union[str, Dict[str, Any]]] = None
 
     class Config:
         env_prefix: str = ""
@@ -188,7 +191,9 @@ class GcpSettings(BaseSettings):
         """
         Builds the gcsfs config kwargs
         """
-        config = {}
+        config = {
+            **(self.gcs_fs_config or {})
+        }
         if self.adc_exists: config['token'] = self.google_application_credentials.as_posix()
         if self.project: config['project'] = self.project
         if self.gcs_client_config: config['client_config'] = self.gcs_client_config
@@ -223,6 +228,7 @@ class MinioSettings(BaseSettings):
     minio_region: Optional[str] = None
     minio_config: Optional[Union[str, Dict[str, Any]]] = None
     minio_signature_ver: Optional[str] = 's3v4'
+    minio_fs_config: Optional[Union[str, Dict[str, Any]]] = None
 
     class Config:
         env_prefix: str = ""
@@ -274,7 +280,8 @@ class MinioSettings(BaseSettings):
             },
             "config_kwargs": {
                 "signature_version": self.minio_signature_ver,
-            }
+            },
+            **(self.minio_fs_config or {})
         }
         if self.minio_access_key:
             config["key"] = self.minio_access_key
@@ -295,6 +302,7 @@ class S3CompatSettings(BaseSettings):
     s3_compat_region: Optional[str] = None
     s3_compat_config: Optional[Union[str, Dict[str, Any]]] = None
     s3_compat_signature_ver: Optional[str] = 's3v4'
+    s3_compat_fs_config: Optional[Union[str, Dict[str, Any]]] = None
 
     class Config:
         env_prefix: str = ""
@@ -342,7 +350,8 @@ class S3CompatSettings(BaseSettings):
             },
             "config_kwargs": {
                 "signature_version": self.s3_compat_signature_ver,
-            }
+            },
+            **(self.s3_compat_fs_config or {})
         }
         if self.s3_compat_access_key:
             config["key"] = self.s3_compat_access_key
@@ -553,6 +562,7 @@ class CloudflareR2Settings(BaseSettings):
 
     r2_endpoint: Optional[str] = None
     r2_config: Optional[Union[str, Dict[str, Any]]] = None
+    r2_fs_config: Optional[Union[str, Dict[str, Any]]] = None
 
     class Config:
         env_prefix: str = ""
@@ -600,12 +610,13 @@ class CloudflareR2Settings(BaseSettings):
         """
         Builds the s3fs config dict
         """
-        config = {
+        config: Dict[str, Union[str, Dict[str, Any]]] = {
             "client_kwargs": {
                 "endpoint_url": self.r2_endpoint,
                 "region_name": self.r2_region,
             },
-            "config_kwargs": {}
+            "config_kwargs": {},
+            **(self.r2_fs_config or {})
         }
         if self.r2_access_key_id:
             config["key"] = self.r2_access_key_id
@@ -628,6 +639,7 @@ class WasabiS3Settings(BaseSettings):
 
     wasabi_endpoint: Optional[str] = None
     wasabi_config: Optional[Union[str, Dict[str, Any]]] = None
+    wasabi_fs_config: Optional[Union[str, Dict[str, Any]]] = None
 
     class Config:
         env_prefix: str = ""
@@ -681,7 +693,8 @@ class WasabiS3Settings(BaseSettings):
                 "endpoint_url": self.wasabi_endpoint,
                 "region_name": self.wasabi_region,
             },
-            "config_kwargs": {}
+            "config_kwargs": {},
+            **(self.wasabi_fs_config or {})
         }
         if self.wasabi_access_key_id:
             config["key"] = self.wasabi_access_key_id

@@ -359,8 +359,8 @@ def get_filelike(path: FileType) -> FileLike:
 
 from fileio.types.compat import PYD_VERSION
 
-class File(CloudFileSystemPath):
-    
+class File(CloudFileSystemPath): # type: ignore
+# class File(FilePurePath):
     # __metaclass__ = Type[FileLike]
 
     def __new__(
