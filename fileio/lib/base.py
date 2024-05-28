@@ -1531,13 +1531,13 @@ class FilePath(Path, FilePurePath):
         names = self._accessor.listdir(self)
         for name in names:
             if name in {'.', '..'}: continue
-        yield self._make_child_relpath(name)
+            yield self._make_child_relpath(name)
     
     async def async_iterdir(self) -> AsyncIterable[FilePath]:
         names = await self._accessor.async_listdir(self)
         for name in names:
             if name in {'.', '..'}: continue
-        yield self._make_child_relpath(name)
+            yield self._make_child_relpath(name)
 
     def _raise_closed(self):
         raise ValueError("I/O operation on closed path")
