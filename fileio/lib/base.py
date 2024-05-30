@@ -1605,9 +1605,52 @@ class FilePath(Path, FilePurePath):
     async def __aexit__(self, exc_type, exc, tb):
         self._closed = True
 
+try:
+    from pydantic_core import core_schema
+    from pydantic import GetCoreSchemaHandler, ValidationInfo
+    _has_pydantic_validator = True
+except ImportError:
+    _has_pydantic_validator = False
 
 class FilePosixPath(PosixPath, FilePath, PureFilePosixPath):
     __slots__ = ()
+
+    if _has_pydantic_validator:
+        @classmethod
+        def pydantic_validate(cls, value: Union[str, Path]) -> 'FilePosixPath':
+            """
+            Validate the value of the path
+            """
+            return cls(value)
+
+        @classmethod
+        def __get_pydantic_core_schema__(
+            cls, 
+            source_type: Any, 
+            handler: GetCoreSchemaHandler
+        ) -> core_schema.CoreSchema:
+            """
+            Get the Pydantic CoreSchema for the given source
+            """
+            from_str_schema = core_schema.chain_schema(
+                [
+                    core_schema.str_schema(),
+                    core_schema.no_info_plain_validator_function(cls.pydantic_validate),
+                ]
+            )
+            return core_schema.json_or_python_schema(
+                json_schema=from_str_schema,
+                python_schema = core_schema.union_schema(
+                    [
+                        # check if it's an instance first before doing any further work
+                        core_schema.is_instance_schema(FilePosixPath),
+                        from_str_schema,
+                    ]
+                ),
+                serialization = core_schema.plain_serializer_function_ser_schema(
+                    lambda instance: instance.as_posix()
+                ),
+            )
 
 
 class FileWindowsPath(WindowsPath, FilePath, PureFileWindowsPath):
